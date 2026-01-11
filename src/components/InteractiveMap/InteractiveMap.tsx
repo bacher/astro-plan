@@ -13,11 +13,18 @@ import { useOnRender } from "../../hooks/useOnRender";
 import { AU_IN_KM, PLANETS, SUN } from "../../consts/planets";
 import { calculatePlanetPosition } from "../../utils/orbitMath";
 import { Toolbar } from "../Toolbar/Toolbar";
+import type { Planet } from "../../types/types";
 
 const AU_TO_SCREEN_WIDTH_RATIO = 0.1; // 1 AU = 10% screen width
 
-const SUN_VISUAL_ZOOM = 50;
+const SUN_VISUAL_ZOOM = 30;
 const PLANET_VISUAL_ZOOM = 1000;
+
+type ScaleInfo = {
+  scale: number;
+  au: number;
+  km: number;
+};
 
 function formatDate(date: Date, timeSpeed: number) {
   if (timeSpeed < 86400) {
@@ -38,6 +45,8 @@ export function InteractiveMap() {
   const auScale = AU_TO_SCREEN_WIDTH_RATIO * width * scale;
   const kmScale = auScale / AU_IN_KM;
   const [timeSpeed, setTimeSpeed] = useState(432000);
+
+  const scaleInfo: ScaleInfo = { scale, au: auScale, km: kmScale };
 
   const resize = useEffectEvent(() => {
     const wrapper = wrapperRef.current!;
@@ -99,20 +108,15 @@ export function InteractiveMap() {
     ctx.fill();
 
     for (const planet of PLANETS) {
-      ctx.beginPath();
-
-      const { x, y } = calculatePlanetPosition(planet, time);
-
-      ctx.arc(
-        x * auScale,
-        y * auScale,
-        planet.radius * kmScale * PLANET_VISUAL_ZOOM,
-        0,
-        Math.PI * 2
-      );
-      ctx.fillStyle = planet.color;
-      ctx.fill();
+      drawOrbit(ctx, planet, scaleInfo);
     }
+
+    for (const planet of PLANETS) {
+      drawPlanet(ctx, planet, scaleInfo, time);
+    }
+
+    // for clean up after drawing
+    ctx.beginPath();
 
     ctx.restore();
   });
@@ -135,4 +139,40 @@ export function InteractiveMap() {
       />
     </div>
   );
+}
+
+function drawOrbit(
+  ctx: CanvasRenderingContext2D,
+  planet: Planet,
+  scaleInfo: ScaleInfo
+) {
+  const a = planet.semiMajorAxis * scaleInfo.au;
+  const b = a * Math.sqrt(1 - planet.eccentricity ** 2);
+  const c = a * planet.eccentricity; // distance from center to focus
+
+  ctx.beginPath();
+  ctx.ellipse(-c, 0, a, b, 0, 0, 2 * Math.PI);
+  ctx.strokeStyle = `${planet.color}33`;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function drawPlanet(
+  ctx: CanvasRenderingContext2D,
+  planet: Planet,
+  scaleInfo: ScaleInfo,
+  time: number
+) {
+  const { x, y } = calculatePlanetPosition(planet, time);
+
+  ctx.beginPath();
+  ctx.arc(
+    x * scaleInfo.au,
+    y * scaleInfo.au,
+    planet.radius * scaleInfo.km * PLANET_VISUAL_ZOOM,
+    0,
+    Math.PI * 2
+  );
+  ctx.fillStyle = planet.color;
+  ctx.fill();
 }

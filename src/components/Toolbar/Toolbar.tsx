@@ -1,5 +1,6 @@
 import { last } from "lodash-es";
 import styles from "./Toolbar.module.css";
+import { useRef } from "react";
 
 type ToolbarProps = {
   scale: number;
@@ -31,6 +32,8 @@ export function Toolbar({
   timeSpeed,
   onTimeSpeedChange,
 }: ToolbarProps) {
+  const previousTimeSpeedValueRef = useRef(0);
+
   const preselectedTimeSpeedOption = TIME_SPEED_OPTIONS.find(
     (option) => option.value === timeSpeed
   );
@@ -77,6 +80,18 @@ export function Toolbar({
         }}
       >
         speed up
+      </button>
+      <button
+        onClick={() => {
+          if (timeSpeed === 0) {
+            onTimeSpeedChange(previousTimeSpeedValueRef.current);
+          } else {
+            previousTimeSpeedValueRef.current = timeSpeed;
+            onTimeSpeedChange(0);
+          }
+        }}
+      >
+        {timeSpeed === 0 ? "resume" : "pause"}
       </button>
       <label className={styles.labelBlock}>
         <span className={styles.labelText}>1 sec =</span>

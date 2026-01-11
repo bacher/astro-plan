@@ -16,7 +16,8 @@ export const PLANETS: Planet[] = [
     color: "#8c7853",
     radius: 2_439.7, // km
     semiMajorAxis: 0.387, // AU
-    eccentricity: 0.206,
+    // eccentricity: 0.206,
+    eccentricity: 0.5,
     period: 87.97, // days
     meanAnomaly: 0, // initial position
   },
