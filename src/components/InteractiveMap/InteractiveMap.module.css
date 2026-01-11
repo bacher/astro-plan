@@ -2,6 +2,10 @@
   outline: 1px solid #000;
   aspect-ratio: 16 / 9;
   overflow: hidden;
+
+  @media (prefers-color-scheme: dark) {
+    outline-color: #fff;
+  }
 }
 
 .canvas {
