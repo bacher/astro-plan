@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent } from "react";
 
-export function useOnRender(callback: () => void) {
+export function useOnRender(callback: () => void, interval = 0) {
   const callbackWrapper = useEffectEvent(callback);
 
   useEffect(() => {
@@ -11,7 +11,11 @@ export function useOnRender(callback: () => void) {
         return;
       }
       callbackWrapper();
-      requestAnimationFrame(frame);
+      if (interval > 0) {
+        window.setTimeout(frame, interval);
+      } else {
+        requestAnimationFrame(frame);
+      }
     }
 
     const handler = () => {
@@ -27,5 +31,5 @@ export function useOnRender(callback: () => void) {
     return () => {
       window.removeEventListener("visibilitychange", handler);
     };
-  }, []);
+  }, [interval]);
 }
