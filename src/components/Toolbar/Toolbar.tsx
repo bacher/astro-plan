@@ -41,7 +41,13 @@ export function Toolbar({
   return (
     <div className={styles.root}>
       <label>
-        Scale: <input type="number" readOnly value={scale.toFixed(2)} />
+        Scale:{" "}
+        <input
+          type="number"
+          className={styles.smallInput}
+          readOnly
+          value={scale.toFixed(2)}
+        />
       </label>
       Time Control:
       <button
@@ -72,23 +78,28 @@ export function Toolbar({
       >
         speed up
       </button>
-      <select
-        value={timeSpeedSelectValue}
-        onChange={(event) => {
-          const value = Number(event.target.value);
+      <label className={styles.labelBlock}>
+        <span className={styles.labelText}>1 sec =</span>
+        <select
+          value={timeSpeedSelectValue}
+          onChange={(event) => {
+            const value = Number(event.target.value);
 
-          if (value !== -1) {
-            onTimeSpeedChange(value);
-          }
-        }}
-      >
-        {timeSpeedSelectValue === -1 && <option value="custom">Custom</option>}
-        {TIME_SPEED_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+            if (value !== -1) {
+              onTimeSpeedChange(value);
+            }
+          }}
+        >
+          {timeSpeedSelectValue === -1 && (
+            <option value="custom">Custom</option>
+          )}
+          {TIME_SPEED_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <input readOnly value={`x${timeSpeed}`} />
       <label className={styles.labelBlock}>
         Timestamp: <input readOnly value={dateTime} />

@@ -9,3 +9,11 @@
   gap: 8px;
   align-items: center;
 }
+
+.labelText {
+  white-space: nowrap;
+}
+
+.smallInput {
+  width: 50px;
+}
