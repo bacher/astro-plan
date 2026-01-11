@@ -1,0 +1,9 @@
+.wrapper {
+  outline: 1px solid #000;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.canvas {
+  position: absolute;
+}
