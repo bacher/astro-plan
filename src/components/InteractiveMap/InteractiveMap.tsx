@@ -10,7 +10,14 @@ import { clamp } from "lodash-es";
 
 import styles from "./InteractiveMap.module.css";
 import { useOnRender } from "../../hooks/useOnRender";
-import { AU_IN_KM, PLANETS, SUN } from "../../consts/planets";
+import {
+  AU_IN_KM,
+  AU_IN_M,
+  DAY_IN_SECONDS,
+  G,
+  PLANETS,
+  SUN,
+} from "../../consts/planets";
 import { calculatePlanetPosition } from "../../utils/orbitMath";
 import { Toolbar } from "../Toolbar/Toolbar";
 import type { Planet } from "../../types/types";
@@ -33,18 +40,69 @@ function formatDate(date: Date, timeSpeed: number) {
   return date.toISOString().substring(0, 10); // YYYY-MM-DD
 }
 
+type Rocket = {
+  position: { x: number; y: number }; // au
+  velocity: { x: number; y: number }; // m/s
+  orientation: { x: number; y: number };
+};
+
 export function InteractiveMap() {
   const [[width, height], setCanvasSize] = useState([0, 0]);
   const [startTime] = useState(() => Date.now()); // in milliseconds
   const lastRealTimeRef = useRef(startTime); // in milliseconds
-  const timeRef = useRef(startTime * 0.001); // in seconds
+  const time = startTime * 0.001;
+  const timeRef = useRef(time); // in seconds
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const colorScheme = usePrefersColorScheme();
+  const isDarkMode = colorScheme === "dark";
   const [scale, setScale] = useState(1);
   const auScale = AU_TO_SCREEN_WIDTH_RATIO * width * scale;
   const kmScale = auScale / AU_IN_KM;
   const [timeSpeed, setTimeSpeed] = useState(432000);
+  const [rocket] = useState<Rocket>(() => {
+    const earth = PLANETS[2];
+    const earthPosition = calculatePlanetPosition(earth, time);
+
+    const rotationSpeed =
+      (2 * Math.PI * earth.radius * 1000) /
+      (earth.rotationPeriod * DAY_IN_SECONDS);
+
+    const orbitalSpeed =
+      (2 * Math.PI * earth.semiMajorAxis * AU_IN_M) /
+      (earth.revolutionPeriod * DAY_IN_SECONDS);
+
+    const rocketPosition = {
+      position: addPoints(
+        {
+          x: earthPosition.x,
+          y: earthPosition.y,
+        },
+        rotatePoint(
+          {
+            x: 0,
+            y: earth.radius / AU_IN_KM,
+          },
+          earthPosition.trueAnomaly
+        )
+      ),
+      velocity: rotatePoint(
+        {
+          x: 100,
+          y: orbitalSpeed + rotationSpeed,
+        },
+        earthPosition.trueAnomaly
+      ),
+      orientation: rotatePoint({ x: 0, y: 1 }, earthPosition.trueAnomaly),
+    };
+
+    console.log(
+      "Rocket initial velocity:",
+      rocketPosition.velocity.x,
+      rocketPosition.velocity.y
+    );
+    return rocketPosition;
+  });
 
   const scaleInfo: ScaleInfo = { scale, au: auScale, km: kmScale };
 
@@ -97,6 +155,8 @@ export function InteractiveMap() {
     timeRef.current += timePassed;
     const time = timeRef.current;
 
+    updateRocketPosition(rocket, time, timePassed);
+
     ctx.fillStyle = colorScheme === "dark" ? "#000" : "#fff";
     ctx.fillRect(0, 0, width, height);
 
@@ -106,6 +166,7 @@ export function InteractiveMap() {
     ctx.fillStyle = SUN.color;
     ctx.arc(0, 0, SUN.radius * kmScale * SUN_VISUAL_ZOOM, 0, Math.PI * 2);
     ctx.fill();
+    ctx.beginPath();
 
     for (const planet of PLANETS) {
       drawOrbit(ctx, planet, scaleInfo);
@@ -115,8 +176,7 @@ export function InteractiveMap() {
       drawPlanet(ctx, planet, scaleInfo, time);
     }
 
-    // for clean up after drawing
-    ctx.beginPath();
+    drawRocket(ctx, rocket, scaleInfo, isDarkMode);
 
     ctx.restore();
   });
@@ -141,6 +201,26 @@ export function InteractiveMap() {
   );
 }
 
+function rotatePoint(point: { x: number; y: number }, angle: number) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+
+  return {
+    x: point.x * cos - point.y * sin,
+    y: point.x * sin + point.y * cos,
+  };
+}
+
+function addPoints(
+  point1: { x: number; y: number },
+  point2: { x: number; y: number }
+) {
+  return {
+    x: point1.x + point2.x,
+    y: point1.y + point2.y,
+  };
+}
+
 function drawOrbit(
   ctx: CanvasRenderingContext2D,
   planet: Planet,
@@ -150,11 +230,11 @@ function drawOrbit(
   const b = a * Math.sqrt(1 - planet.eccentricity ** 2);
   const c = a * planet.eccentricity; // distance from center to focus
 
-  ctx.beginPath();
   ctx.ellipse(-c, 0, a, b, 0, 0, 2 * Math.PI);
   ctx.strokeStyle = `${planet.color}33`;
   ctx.lineWidth = 1;
   ctx.stroke();
+  ctx.beginPath();
 }
 
 function drawPlanet(
@@ -165,7 +245,6 @@ function drawPlanet(
 ) {
   const { x, y } = calculatePlanetPosition(planet, time);
 
-  ctx.beginPath();
   ctx.arc(
     x * scaleInfo.au,
     y * scaleInfo.au,
@@ -175,4 +254,56 @@ function drawPlanet(
   );
   ctx.fillStyle = planet.color;
   ctx.fill();
+  ctx.beginPath();
+}
+
+function drawRocket(
+  ctx: CanvasRenderingContext2D,
+  rocket: Rocket,
+  scaleInfo: ScaleInfo,
+  isDarkMode: boolean
+) {
+  ctx.ellipse(
+    rocket.position.x * scaleInfo.au,
+    rocket.position.y * scaleInfo.au,
+    10,
+    5,
+    Math.atan2(rocket.orientation.y, rocket.orientation.x),
+    0,
+    2 * Math.PI
+  );
+  ctx.fillStyle = isDarkMode ? "#fff" : "#000";
+  ctx.fill();
+  ctx.beginPath();
+}
+
+function updateRocketPosition(
+  rocket: Rocket,
+  time: number,
+  timePassed: number // in seconds
+) {
+  rocket.position.x += (rocket.velocity.x * timePassed) / AU_IN_M;
+  rocket.position.y += (rocket.velocity.y * timePassed) / AU_IN_M;
+
+  for (const planet of PLANETS) {
+    const { x, y } = calculatePlanetPosition(planet, time);
+    const directionToPlanet = Math.atan2(
+      y - rocket.position.y,
+      x - rocket.position.x
+    );
+
+    const distance = Math.sqrt(
+      (rocket.position.x - x) ** 2 + (rocket.position.y - y) ** 2
+    );
+
+    const g = (G * planet.mass) / (distance * AU_IN_M) ** 2;
+    rocket.velocity = addPoints(
+      rocket.velocity,
+      rotatePoint({ x: (g * timePassed) / 2, y: 0 }, directionToPlanet)
+    );
+
+    if (planet.name === "Earth") {
+      // console.log("Velocity:", rocket.velocity.x, rocket.velocity.y);
+    }
+  }
 }

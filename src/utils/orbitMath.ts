@@ -36,9 +36,9 @@ function solveKeplersEquation(M: number, e: number, tolerance = 1e-6) {
 export function calculatePlanetPosition(
   planet: Planet,
   time: number
-): { x: number; y: number; r: number } {
+): { x: number; y: number; r: number; trueAnomaly: number } {
   // Calculate mean anomaly
-  const n = (2 * Math.PI) / planet.period; // mean motion
+  const n = (2 * Math.PI) / planet.revolutionPeriod; // mean motion
   const M = planet.meanAnomaly + n * (time / SECONDS_IN_DAY);
 
   // Solve Kepler's equation for eccentric anomaly
@@ -59,5 +59,5 @@ export function calculatePlanetPosition(
   const x = r * Math.cos(trueAnomaly);
   const y = r * Math.sin(trueAnomaly);
 
-  return { x, y, r };
+  return { x, y, r, trueAnomaly };
 }

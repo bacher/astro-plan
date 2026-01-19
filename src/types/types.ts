@@ -4,6 +4,8 @@ export type Planet = {
   radius: number; // km
   semiMajorAxis: number; // AU
   eccentricity: number;
-  period: number; // days
+  mass: number; // kg
+  revolutionPeriod: number; // days
+  rotationPeriod: number; // days
   meanAnomaly: number;
 };
