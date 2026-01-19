@@ -11,9 +11,16 @@ import { clamp } from "lodash-es";
 import styles from "./InteractiveMap.module.css";
 import { useOnRender } from "../../hooks/useOnRender";
 import { Toolbar } from "../Toolbar/Toolbar";
+import { EARTH, G } from "../../consts/planets";
+import { addPoints, rotatePoint } from "./utils";
 
-const AU_TO_SCREEN_WIDTH_RATIO = 0.1; // 1 AU = 10% screen width
+type Rocket = {
+  position: { x: number; y: number }; // m
+  angle: number; // turns
+  speed: { x: number; y: number }; // m/s
+}
 
+const KM_TO_SCREEN_WIDTH_RATIO = 0.00000003; // ratio of 1 KM / screen width
 
 function formatDate(date: Date, timeSpeed: number) {
   if (timeSpeed < 86400) {
@@ -32,10 +39,17 @@ export function InteractiveMap_ellipse() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const colorScheme = usePrefersColorScheme();
   const isDarkMode = colorScheme === "dark";
-  const [scale, setScale] = useState(1);
-  const auScale = AU_TO_SCREEN_WIDTH_RATIO * width * scale;
-  const [timeSpeed, setTimeSpeed] = useState(432000);
+  const [zoomScale, setZoomScale] = useState(1);
+  const scale = KM_TO_SCREEN_WIDTH_RATIO * width * zoomScale;
+  const [timeSpeed, setTimeSpeed] = useState(2*432000/5/24/60);
 
+  const [rocket] = useState(() => {
+    return {
+      position: { x: -(418_200 + EARTH.radius * 1000), y: 0 },
+      angle: 0,
+      speed: {x: 0, y: 7_663.59}, // wiki: ~7.7km/s
+    }
+  });
 
   const resize = useEffectEvent(() => {
     const wrapper = wrapperRef.current!;
@@ -54,7 +68,7 @@ export function InteractiveMap_ellipse() {
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
-      setScale((scale) => clamp(scale * (1 + event.deltaY * 0.001), 0.1, 10));
+      setZoomScale((zoomScale) => clamp(zoomScale * (1 + event.deltaY * 0.001), 0.1, 10));
     };
 
     const canvas = canvasRef.current!;
@@ -75,6 +89,10 @@ export function InteractiveMap_ellipse() {
   );
 
   useOnRender(() => {
+    if (scale === 0) {
+      return;
+    };
+    
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
 
@@ -87,14 +105,37 @@ export function InteractiveMap_ellipse() {
     const time = timeRef.current;
 
     // UPDATE
-
+    const ITERATIONS = 500;
+    const timePassedPerStep = timePassed / ITERATIONS;
+    for (let i = 0; i < ITERATIONS; i += 1) {
+      updateRocketPosition(rocket, timePassedPerStep);
+    }
     ctx.fillStyle = colorScheme === "dark" ? "#000" : "#fff";
     ctx.fillRect(0, 0, width, height);
 
     ctx.save();
-    ctx.translate(width / 2, height / 2);
+    ctx.translate(width / 4, height / 2);
 
     // DRAW
+
+    ctx.moveTo(0, -height/2);
+    ctx.lineTo(0, height/2);
+    ctx.moveTo(-width/4, 0);
+    ctx.lineTo(3*width/4, 0);
+    ctx.strokeStyle = isDarkMode ? '#333' : '#bbb';
+    ctx.stroke();
+    ctx.beginPath();
+
+    // draw Earth
+    ctx.arc(0, 0, EARTH.radius * 1000 * scale, 0, 2 * Math.PI);
+    ctx.fillStyle = isDarkMode ? '#fff' : '#000';
+    ctx.fill();
+    ctx.beginPath();
+
+    ctx.arc(rocket.position.x * scale, rocket.position.y * scale, 4, 0, 2 * Math.PI);
+    ctx.fillStyle = isDarkMode ? '#fff' : '#000';
+    ctx.fill();
+    ctx.beginPath();
 
     ctx.restore();
   });
@@ -112,9 +153,48 @@ export function InteractiveMap_ellipse() {
       <Toolbar
         dateTime={dateTime}
         timeSpeed={timeSpeed}
-        scale={scale}
+        scale={zoomScale}
         onTimeSpeedChange={setTimeSpeed}
       />
     </div>
   );
+}
+
+const node = document.createElement('div');
+document.body.appendChild(node);
+node.style.position = 'absolute';
+node.style.bottom = '0';
+node.style.left = '0';
+node.style.width = '500px';
+
+const node2 = document.createElement('div');
+document.body.appendChild(node2);
+node2.style.position = 'absolute';
+node2.style.bottom = '0';
+node2.style.right = '0';
+node2.style.width = '500px';
+
+function updateRocketPosition(rocket: Rocket, timePassed: number) {
+  const directionToPlanet = Math.atan2(
+    -rocket.position.y,
+    -rocket.position.x
+  );
+  const distance = Math.sqrt(rocket.position.x ** 2 + rocket.position.y ** 2);
+  const g = (G * EARTH.mass) / (distance ** 2);
+
+  node2.innerHTML = `G: ${G}<br>mass: ${EARTH.mass}<br>distance: ${distance.toFixed(0)} m<br>g: ${g.toFixed(4)}`;
+
+//   if (acceleration.y !== 0.0) {
+//     node.innerHTML = `acceleration (x): ${acceleration.x.toFixed(4)} m/s2<br>acceleration (y): ${acceleration.y.toFixed(4)} m/s2`;
+//  }
+
+  const acceleration = rotatePoint({ x: g * timePassed, y: 0 }, directionToPlanet);
+  
+  rocket.speed = addPoints(
+    rocket.speed,
+    acceleration,
+  );
+
+  rocket.position.x += rocket.speed.x * timePassed;
+  rocket.position.y += rocket.speed.y * timePassed;
 }

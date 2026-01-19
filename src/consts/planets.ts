@@ -3,7 +3,7 @@ import type { Planet } from "../types/types";
 export const AU_IN_KM = 1.496e8;
 export const AU_IN_M = 1.496e11;
 
-export const G = 6.674484e-11;
+export const G = 6.674484e-11; // m^3 s^-2 kg^-1
 
 export const SUN = {
   name: "Sun",
@@ -105,3 +105,5 @@ export const PLANETS: Planet[] = [
     meanAnomaly: 0,
   },
 ];
+
+export const EARTH = PLANETS[2];

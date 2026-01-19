@@ -29,7 +29,7 @@ const SUN_VISUAL_ZOOM = 30;
 const PLANET_VISUAL_ZOOM = 1000;
 
 type ScaleInfo = {
-  scale: number;
+  zoomScale: number;
   au: number;
   km: number;
 };
@@ -57,8 +57,8 @@ export function InteractiveMap() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const colorScheme = usePrefersColorScheme();
   const isDarkMode = colorScheme === "dark";
-  const [scale, setScale] = useState(1);
-  const auScale = AU_TO_SCREEN_WIDTH_RATIO * width * scale;
+  const [zoomScale, setZoomScale] = useState(1);
+  const auScale = AU_TO_SCREEN_WIDTH_RATIO * width * zoomScale;
   const kmScale = auScale / AU_IN_KM;
   const [timeSpeed, setTimeSpeed] = useState(432000);
   const [rocket] = useState<Rocket>(() => {
@@ -105,7 +105,7 @@ export function InteractiveMap() {
     return rocketPosition;
   });
 
-  const scaleInfo: ScaleInfo = { scale, au: auScale, km: kmScale };
+  const scaleInfo: ScaleInfo = { zoomScale, au: auScale, km: kmScale };
 
   const resize = useEffectEvent(() => {
     const wrapper = wrapperRef.current!;
@@ -124,7 +124,7 @@ export function InteractiveMap() {
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
-      setScale((scale) => clamp(scale * (1 + event.deltaY * 0.001), 0.1, 10));
+      setZoomScale((zoomScale) => clamp(zoomScale * (1 + event.deltaY * 0.001), 0.1, 10));
     };
 
     const canvas = canvasRef.current!;
@@ -195,7 +195,7 @@ export function InteractiveMap() {
       <Toolbar
         dateTime={dateTime}
         timeSpeed={timeSpeed}
-        scale={scale}
+        scale={zoomScale}
         onTimeSpeedChange={setTimeSpeed}
       />
     </div>
@@ -280,7 +280,7 @@ function updateRocketPosition(
     const g = (G * planet.mass) / (distance * AU_IN_M) ** 2;
     rocket.velocity = addPoints(
       rocket.velocity,
-      rotatePoint({ x: (g * timePassed) / 2, y: 0 }, directionToPlanet)
+      rotatePoint({ x: g * timePassed, y: 0 }, directionToPlanet)
     );
 
     if (planet.name === "Earth") {
