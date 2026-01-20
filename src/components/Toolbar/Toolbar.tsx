@@ -54,7 +54,6 @@ export function Toolbar({
       </label>
       Time Control:
       <button
-        disabled={timeSpeed === 0}
         onClick={() => {
           const index = TIME_SPEED_OPTIONS.findIndex(
             (option) => option.value === timeSpeed
@@ -62,6 +61,8 @@ export function Toolbar({
           if (index > 0) {
             const down = TIME_SPEED_OPTIONS[index - 1];
             onTimeSpeedChange(down.value);
+          } else {
+            onTimeSpeedChange(timeSpeed / 2);
           }
         }}
       >
@@ -76,6 +77,8 @@ export function Toolbar({
           if (index !== -1 && TIME_SPEED_OPTIONS[index + 1]) {
             const up = TIME_SPEED_OPTIONS[index + 1];
             onTimeSpeedChange(up.value);
+          } else {
+            onTimeSpeedChange(timeSpeed * 2);
           }
         }}
       >

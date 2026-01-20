@@ -20,7 +20,7 @@ type Rocket = {
   speed: { x: number; y: number }; // m/s
 }
 
-const KM_TO_SCREEN_WIDTH_RATIO = 0.00000003; // ratio of 1 KM / screen width
+const KM_TO_SCREEN_WIDTH_RATIO = 0.00000002; // ratio of 1 KM / screen width
 
 function formatDate(date: Date, timeSpeed: number) {
   if (timeSpeed < 86400) {
@@ -42,12 +42,13 @@ export function InteractiveMap_ellipse() {
   const [zoomScale, setZoomScale] = useState(1);
   const scale = KM_TO_SCREEN_WIDTH_RATIO * width * zoomScale;
   const [timeSpeed, setTimeSpeed] = useState(2*432000/5/24/60);
+  const historicalRocketPositionsRef = useRef<{ lastUpdated: number, positions: { x: number; y: number }[] }>(undefined);
 
   const [rocket] = useState(() => {
     return {
       position: { x: -(418_200 + EARTH.radius * 1000), y: 0 },
       angle: 0,
-      speed: {x: 0, y: 7_663.59}, // wiki: ~7.7km/s
+      speed: {x: 0, y: 7_663.584}, // wiki: ~7.7km/s
     }
   });
 
@@ -104,14 +105,35 @@ export function InteractiveMap_ellipse() {
     timeRef.current += timePassed;
     const time = timeRef.current;
 
-    // UPDATE
-    const ITERATIONS = 500;
-    const timePassedPerStep = timePassed / ITERATIONS;
-    for (let i = 0; i < ITERATIONS; i += 1) {
-      updateRocketPosition(rocket, timePassedPerStep);
+    if (timePassed > 0) {
+      // UPDATE
+      const ITERATIONS = 500;
+      const timePassedPerStep = timePassed / ITERATIONS;
+      for (let i = 0; i < ITERATIONS; i += 1) {
+        updateRocketPosition(rocket, timePassedPerStep);
+      }
+
+      if (!historicalRocketPositionsRef.current) {
+        historicalRocketPositionsRef.current = {
+          lastUpdated: 0,
+          positions: [] as { x: number; y: number }[]
+        };
+      }
+      const cur = historicalRocketPositionsRef.current;
+
+      cur.lastUpdated -= realTimePassed;
+      if (cur.lastUpdated <= 0) {
+        cur.positions.push({
+          x: rocket.position.x,
+          y: rocket.position.y,
+        });
+        cur.lastUpdated = 2000;
+      }
     }
+
     ctx.fillStyle = colorScheme === "dark" ? "#000" : "#fff";
     ctx.fillRect(0, 0, width, height);
+    ctx.beginPath();
 
     ctx.save();
     ctx.translate(width / 4, height / 2);
@@ -125,6 +147,33 @@ export function InteractiveMap_ellipse() {
     ctx.strokeStyle = isDarkMode ? '#333' : '#bbb';
     ctx.stroke();
     ctx.beginPath();
+
+    const cur = historicalRocketPositionsRef.current;
+    if (cur) {
+      let first = true;
+      for (const position of cur.positions) {
+        if (first) {
+          ctx.moveTo(position.x * scale, position.y * scale);
+          first = false;
+        } else {
+          ctx.lineTo(position.x * scale, position.y * scale);
+        }
+      }
+
+      ctx.strokeStyle = isDarkMode ? '#444' : '#aaa';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+
+      for (const position of cur.positions) {
+        ctx.arc(position.x * scale, position.y * scale, 4, 0, 2 * Math.PI);
+        ctx.closePath();
+      }
+      ctx.fillStyle = isDarkMode ? '#444' : '#aaa';
+      ctx.fill();
+      ctx.beginPath();
+    }
 
     // draw Earth
     ctx.arc(0, 0, EARTH.radius * 1000 * scale, 0, 2 * Math.PI);
@@ -182,19 +231,20 @@ function updateRocketPosition(rocket: Rocket, timePassed: number) {
   const distance = Math.sqrt(rocket.position.x ** 2 + rocket.position.y ** 2);
   const g = (G * EARTH.mass) / (distance ** 2);
 
-  node2.innerHTML = `G: ${G}<br>mass: ${EARTH.mass}<br>distance: ${distance.toFixed(0)} m<br>g: ${g.toFixed(4)}`;
-
-//   if (acceleration.y !== 0.0) {
-//     node.innerHTML = `acceleration (x): ${acceleration.x.toFixed(4)} m/s2<br>acceleration (y): ${acceleration.y.toFixed(4)} m/s2`;
-//  }
+  node2.innerHTML = `G: ${G}<br>mass: ${EARTH.mass}<br>
+    distance: ${distance.toFixed(0)} m<br>
+    g: ${g.toFixed(4)}`;
 
   const acceleration = rotatePoint({ x: g * timePassed, y: 0 }, directionToPlanet);
   
+  rocket.position.x += (rocket.speed.x + acceleration.x / 2) * timePassed;
+  rocket.position.y += (rocket.speed.y + acceleration.y / 2) * timePassed;
+
   rocket.speed = addPoints(
     rocket.speed,
     acceleration,
   );
 
-  rocket.position.x += rocket.speed.x * timePassed;
-  rocket.position.y += rocket.speed.y * timePassed;
+  node.innerHTML = `x: ${rocket.position.x.toFixed(0)}<br>y: ${rocket.position.y.toFixed(0)}<br>
+    speed (x): ${rocket.speed.x.toFixed(2)}<br>speed (y): ${rocket.speed.y.toFixed(2)}`;
 }
