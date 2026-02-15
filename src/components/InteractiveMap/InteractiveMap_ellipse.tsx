@@ -243,15 +243,15 @@ function updateRocketPosition(rocket: Rocket, timePassed: number) {
     distance: ${distance.toFixed(0)} m<br>
     g: ${g.toFixed(4)}`;
 
-  const acceleration = rotatePoint(
+  const speed_change = rotatePoint(
     { x: g * timePassed, y: 0 },
     directionToPlanet,
   );
 
-  rocket.position.x += (rocket.speed.x + acceleration.x / 2) * timePassed;
-  rocket.position.y += (rocket.speed.y + acceleration.y / 2) * timePassed;
+  rocket.position.x += (rocket.speed.x + speed_change.x / 2) * timePassed;
+  rocket.position.y += (rocket.speed.y + speed_change.y / 2) * timePassed;
 
-  rocket.speed = addPoints(rocket.speed, acceleration);
+  rocket.speed = addPoints(rocket.speed, speed_change);
 
   node.innerHTML = `x: ${rocket.position.x.toFixed(0)}<br>y: ${rocket.position.y.toFixed(0)}<br>
     speed (x): ${rocket.speed.x.toFixed(2)}<br>speed (y): ${rocket.speed.y.toFixed(2)}`;
