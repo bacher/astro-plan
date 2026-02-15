@@ -35,7 +35,7 @@ export function Toolbar({
   const previousTimeSpeedValueRef = useRef(0);
 
   const preselectedTimeSpeedOption = TIME_SPEED_OPTIONS.find(
-    (option) => option.value === timeSpeed
+    (option) => option.value === timeSpeed,
   );
   const timeSpeedSelectValue = preselectedTimeSpeedOption
     ? preselectedTimeSpeedOption.value
@@ -56,7 +56,7 @@ export function Toolbar({
       <button
         onClick={() => {
           const index = TIME_SPEED_OPTIONS.findIndex(
-            (option) => option.value === timeSpeed
+            (option) => option.value === timeSpeed,
           );
           if (index > 0) {
             const down = TIME_SPEED_OPTIONS[index - 1];
@@ -72,7 +72,7 @@ export function Toolbar({
         disabled={timeSpeed >= MAX_TIME_SPEED}
         onClick={() => {
           const index = TIME_SPEED_OPTIONS.findIndex(
-            (option) => option.value === timeSpeed
+            (option) => option.value === timeSpeed,
           );
           if (index !== -1 && TIME_SPEED_OPTIONS[index + 1]) {
             const up = TIME_SPEED_OPTIONS[index + 1];

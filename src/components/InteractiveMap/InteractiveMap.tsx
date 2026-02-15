@@ -4,12 +4,12 @@ import {
   useEffectEvent,
   useState,
   useEffect,
-} from "react";
-import { usePrefersColorScheme } from "use-prefers-color-scheme";
-import { clamp } from "lodash-es";
+} from 'react';
+import { usePrefersColorScheme } from 'use-prefers-color-scheme';
+import { clamp } from 'lodash-es';
 
-import styles from "./InteractiveMap.module.css";
-import { useOnRender } from "../../hooks/useOnRender";
+import styles from './InteractiveMap.module.css';
+import { useOnRender } from '../../hooks/useOnRender';
 import {
   AU_IN_KM,
   AU_IN_M,
@@ -17,11 +17,11 @@ import {
   G,
   PLANETS,
   SUN,
-} from "../../consts/planets";
-import { calculatePlanetPosition } from "../../utils/orbitMath";
-import { Toolbar } from "../Toolbar/Toolbar";
-import type { Planet } from "../../types/types";
-import { addPoints, rotatePoint } from "./utils";
+} from '../../consts/planets';
+import { calculatePlanetPosition } from '../../utils/orbitMath';
+import { Toolbar } from '../Toolbar/Toolbar';
+import type { Planet } from '../../types/types';
+import { addPoints, rotatePoint } from './utils';
 
 const AU_TO_SCREEN_WIDTH_RATIO = 0.1; // 1 AU = 10% screen width
 
@@ -56,7 +56,7 @@ export function InteractiveMap() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const colorScheme = usePrefersColorScheme();
-  const isDarkMode = colorScheme === "dark";
+  const isDarkMode = colorScheme === 'dark';
   const [zoomScale, setZoomScale] = useState(1);
   const auScale = AU_TO_SCREEN_WIDTH_RATIO * width * zoomScale;
   const kmScale = auScale / AU_IN_KM;
@@ -84,23 +84,23 @@ export function InteractiveMap() {
             x: 0,
             y: earth.radius / AU_IN_KM,
           },
-          earthPosition.trueAnomaly
-        )
+          earthPosition.trueAnomaly,
+        ),
       ),
       velocity: rotatePoint(
         {
           x: 100,
           y: orbitalSpeed + rotationSpeed,
         },
-        earthPosition.trueAnomaly
+        earthPosition.trueAnomaly,
       ),
       orientation: rotatePoint({ x: 0, y: 1 }, earthPosition.trueAnomaly),
     };
 
     console.log(
-      "Rocket initial velocity:",
+      'Rocket initial velocity:',
       rocketPosition.velocity.x,
-      rocketPosition.velocity.y
+      rocketPosition.velocity.y,
     );
     return rocketPosition;
   });
@@ -115,38 +115,40 @@ export function InteractiveMap() {
   useLayoutEffect(() => {
     resize();
 
-    window.addEventListener("resize", resize, { passive: true });
+    window.addEventListener('resize', resize, { passive: true });
     return () => {
-      window.removeEventListener("resize", resize);
+      window.removeEventListener('resize', resize);
     };
   }, []);
 
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
-      setZoomScale((zoomScale) => clamp(zoomScale * (1 + event.deltaY * 0.001), 0.1, 10));
+      setZoomScale((zoomScale) =>
+        clamp(zoomScale * (1 + event.deltaY * 0.001), 0.1, 10),
+      );
     };
 
     const canvas = canvasRef.current!;
-    canvas.addEventListener("wheel", handleWheel);
+    canvas.addEventListener('wheel', handleWheel);
     return () => {
-      canvas.removeEventListener("wheel", handleWheel);
+      canvas.removeEventListener('wheel', handleWheel);
     };
   }, []);
 
   const [dateTime, setDateTime] = useState(() =>
-    formatDate(new Date(startTime * 1000), timeSpeed)
+    formatDate(new Date(startTime * 1000), timeSpeed),
   );
   useOnRender(
     () => {
       setDateTime(formatDate(new Date(timeRef.current * 1000), timeSpeed));
     },
-    timeSpeed > 86400 ? 1000 : 250
+    timeSpeed > 86400 ? 1000 : 250,
   );
 
   useOnRender(() => {
     const canvas = canvasRef.current!;
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext('2d')!;
 
     const now = Date.now();
     const realTimePassed = now - lastRealTimeRef.current;
@@ -158,7 +160,7 @@ export function InteractiveMap() {
 
     updateRocketPosition(rocket, time, timePassed);
 
-    ctx.fillStyle = colorScheme === "dark" ? "#000" : "#fff";
+    ctx.fillStyle = colorScheme === 'dark' ? '#000' : '#fff';
     ctx.fillRect(0, 0, width, height);
 
     ctx.save();
@@ -205,7 +207,7 @@ export function InteractiveMap() {
 function drawOrbit(
   ctx: CanvasRenderingContext2D,
   planet: Planet,
-  scaleInfo: ScaleInfo
+  scaleInfo: ScaleInfo,
 ) {
   const a = planet.semiMajorAxis * scaleInfo.au;
   const b = a * Math.sqrt(1 - planet.eccentricity ** 2);
@@ -222,7 +224,7 @@ function drawPlanet(
   ctx: CanvasRenderingContext2D,
   planet: Planet,
   scaleInfo: ScaleInfo,
-  time: number
+  time: number,
 ) {
   const { x, y } = calculatePlanetPosition(planet, time);
 
@@ -231,7 +233,7 @@ function drawPlanet(
     y * scaleInfo.au,
     planet.radius * scaleInfo.km * PLANET_VISUAL_ZOOM,
     0,
-    Math.PI * 2
+    Math.PI * 2,
   );
   ctx.fillStyle = planet.color;
   ctx.fill();
@@ -242,7 +244,7 @@ function drawRocket(
   ctx: CanvasRenderingContext2D,
   rocket: Rocket,
   scaleInfo: ScaleInfo,
-  isDarkMode: boolean
+  isDarkMode: boolean,
 ) {
   ctx.ellipse(
     rocket.position.x * scaleInfo.au,
@@ -251,9 +253,9 @@ function drawRocket(
     5,
     Math.atan2(rocket.orientation.y, rocket.orientation.x),
     0,
-    2 * Math.PI
+    2 * Math.PI,
   );
-  ctx.fillStyle = isDarkMode ? "#fff" : "#000";
+  ctx.fillStyle = isDarkMode ? '#fff' : '#000';
   ctx.fill();
   ctx.beginPath();
 }
@@ -261,7 +263,7 @@ function drawRocket(
 function updateRocketPosition(
   rocket: Rocket,
   time: number,
-  timePassed: number // in seconds
+  timePassed: number, // in seconds
 ) {
   rocket.position.x += (rocket.velocity.x * timePassed) / AU_IN_M;
   rocket.position.y += (rocket.velocity.y * timePassed) / AU_IN_M;
@@ -270,20 +272,20 @@ function updateRocketPosition(
     const { x, y } = calculatePlanetPosition(planet, time);
     const directionToPlanet = Math.atan2(
       y - rocket.position.y,
-      x - rocket.position.x
+      x - rocket.position.x,
     );
 
     const distance = Math.sqrt(
-      (rocket.position.x - x) ** 2 + (rocket.position.y - y) ** 2
+      (rocket.position.x - x) ** 2 + (rocket.position.y - y) ** 2,
     );
 
     const g = (G * planet.mass) / (distance * AU_IN_M) ** 2;
     rocket.velocity = addPoints(
       rocket.velocity,
-      rotatePoint({ x: g * timePassed, y: 0 }, directionToPlanet)
+      rotatePoint({ x: g * timePassed, y: 0 }, directionToPlanet),
     );
 
-    if (planet.name === "Earth") {
+    if (planet.name === 'Earth') {
       // console.log("Velocity:", rocket.velocity.x, rocket.velocity.y);
     }
   }

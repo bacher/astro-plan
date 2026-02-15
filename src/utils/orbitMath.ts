@@ -35,7 +35,7 @@ function solveKeplersEquation(M: number, e: number, tolerance = 1e-6) {
 
 export function calculatePlanetPosition(
   planet: Planet,
-  time: number
+  time: number,
 ): { x: number; y: number; r: number; trueAnomaly: number } {
   // Calculate mean anomaly
   const n = (2 * Math.PI) / planet.revolutionPeriod; // mean motion
@@ -49,7 +49,7 @@ export function calculatePlanetPosition(
     2 *
     Math.atan2(
       Math.sqrt(1 + planet.eccentricity) * Math.sin(E / 2),
-      Math.sqrt(1 - planet.eccentricity) * Math.cos(E / 2)
+      Math.sqrt(1 - planet.eccentricity) * Math.cos(E / 2),
     );
 
   // Calculate distance from sun
