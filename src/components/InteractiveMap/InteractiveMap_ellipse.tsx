@@ -16,7 +16,7 @@ import { addPoints, rotatePoint } from './utils';
 
 type Rocket = {
   position: { x: number; y: number }; // m
-  angle: number; // turns
+  angle: number; // rads
   speed: { x: number; y: number }; // m/s
 };
 
@@ -186,15 +186,22 @@ export function InteractiveMap_ellipse() {
     ctx.fill();
     ctx.beginPath();
 
-    ctx.arc(
-      rocket.position.x * scale,
-      rocket.position.y * scale,
-      4,
-      0,
-      2 * Math.PI,
-    );
+    // draw rocket
+    const rocketX = rocket.position.x * scale;
+    const rocketY = rocket.position.y * scale;
+
+    ctx.arc(rocketX, rocketY, 4, 0, 2 * Math.PI);
     ctx.fillStyle = isDarkMode ? '#fff' : '#000';
     ctx.fill();
+    ctx.beginPath();
+
+    // draw rocket orientation
+    ctx.moveTo(rocketX, rocketY);
+    const dX = Math.cos(rocket.angle);
+    const dY = Math.sin(rocket.angle);
+    ctx.lineTo(rocketX + dX * 20, rocketY + dY * 20);
+    ctx.strokeStyle = isDarkMode ? '#fff' : '#000';
+    ctx.stroke();
     ctx.beginPath();
 
     ctx.restore();
@@ -251,8 +258,21 @@ function updateRocketPosition(rocket: Rocket, timePassed: number) {
   rocket.position.x += (rocket.speed.x + speed_change.x / 2) * timePassed;
   rocket.position.y += (rocket.speed.y + speed_change.y / 2) * timePassed;
 
-  rocket.speed = addPoints(rocket.speed, speed_change);
+  const updatedSpeed = addPoints(rocket.speed, speed_change);
+
+  rocket.angle += calculateAngleChange(rocket.speed, updatedSpeed);
+
+  rocket.speed = updatedSpeed;
 
   node.innerHTML = `x: ${rocket.position.x.toFixed(0)}<br>y: ${rocket.position.y.toFixed(0)}<br>
     speed (x): ${rocket.speed.x.toFixed(2)}<br>speed (y): ${rocket.speed.y.toFixed(2)}`;
+}
+
+function calculateAngleChange(
+  speed: { x: number; y: number },
+  updatedSpeed: { x: number; y: number },
+) {
+  const angle = Math.atan2(speed.y, speed.x);
+  const updatedAngle = Math.atan2(updatedSpeed.y, updatedSpeed.x);
+  return updatedAngle - angle;
 }
