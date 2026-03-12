@@ -13,12 +13,17 @@ import { useOnRender } from '../../hooks/useOnRender';
 import { Toolbar } from '../Toolbar/Toolbar';
 import { EARTH, G } from '../../consts/planets';
 import { addPoints, rotatePoint } from './utils';
+import savedTrajectory from './savedTrajectory.json';
+import { useMousePosition } from '../../hooks/useMousePosition';
+import { useKeydown } from '../../hooks/useKeydown';
 
 type Rocket = {
   position: { x: number; y: number }; // m
   angle: number; // rads
   speed: { x: number; y: number }; // m/s
 };
+
+const THRUST_FORCE = 0.5 * 9.8; // m/s^2
 
 const KM_TO_SCREEN_WIDTH_RATIO = 0.00000002; // ratio of 1 KM / screen width
 
@@ -41,11 +46,13 @@ export function InteractiveMap_ellipse() {
   const isDarkMode = colorScheme === 'dark';
   const [zoomScale, setZoomScale] = useState(1);
   const scale = KM_TO_SCREEN_WIDTH_RATIO * width * zoomScale;
-  const [timeSpeed, setTimeSpeed] = useState((2 * 432000) / 5 / 24 / 60);
+  const [timeSpeed, setTimeSpeed] = useState(480);
   const historicalRocketPositionsRef = useRef<{
     lastUpdated: number;
     positions: { x: number; y: number }[];
   }>(undefined);
+
+  const canvasPositionRef = useRef({ x: 0, y: 0 });
 
   const [rocket] = useState(() => {
     return {
@@ -55,9 +62,39 @@ export function InteractiveMap_ellipse() {
     };
   });
 
+  function convertMousePositionToWorldPosition(x: number, y: number) {
+    const canvasPosition = canvasPositionRef.current;
+
+    const worldX = x - canvasPosition.x - width / 4;
+    const worldY = y - canvasPosition.y - height / 2;
+
+    return {
+      x: worldX / scale,
+      y: worldY / scale,
+    };
+  }
+
+  const updateRocketAngle = useEffectEvent(
+    (mousePosition: { x: number; y: number }) => {
+      const { x, y } = convertMousePositionToWorldPosition(
+        mousePosition.x,
+        mousePosition.y,
+      );
+      const dx = x - rocket.position.x;
+      const dy = y - rocket.position.y;
+      rocket.angle = Math.atan2(dy, dx);
+    },
+  );
+
+  const mousePosition = useMousePosition(updateRocketAngle);
+
+  const pressedKeys = useKeydown([' ']);
+
   const resize = useEffectEvent(() => {
     const wrapper = wrapperRef.current!;
     setCanvasSize([wrapper.clientWidth, wrapper.clientHeight]);
+    const { left, top } = canvasRef.current!.getBoundingClientRect();
+    canvasPositionRef.current = { x: left, y: top };
   });
 
   useLayoutEffect(() => {
@@ -73,7 +110,7 @@ export function InteractiveMap_ellipse() {
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
       setZoomScale((zoomScale) =>
-        clamp(zoomScale * (1 + event.deltaY * 0.001), 0.1, 10),
+        clamp(zoomScale * (1 - event.deltaY * 0.001), 0.1, 10),
       );
     };
 
@@ -108,15 +145,16 @@ export function InteractiveMap_ellipse() {
 
     const timePassed = realTimePassed * timeSpeed * 0.001; // * 0.001 to convert to seconds
     timeRef.current += timePassed;
-    const time = timeRef.current;
+    // const time = timeRef.current;
 
     if (timePassed > 0) {
       // UPDATE
-      const ITERATIONS = 500;
+      const ITERATIONS = 25;
       const timePassedPerStep = timePassed / ITERATIONS;
       for (let i = 0; i < ITERATIONS; i += 1) {
-        updateRocketPosition(rocket, timePassedPerStep);
+        updateRocketPosition(rocket, timePassedPerStep, pressedKeys.has(' '));
       }
+      updateRocketAngle(mousePosition);
 
       if (!historicalRocketPositionsRef.current) {
         historicalRocketPositionsRef.current = {
@@ -126,13 +164,13 @@ export function InteractiveMap_ellipse() {
       }
       const cur = historicalRocketPositionsRef.current;
 
-      cur.lastUpdated -= realTimePassed;
+      cur.lastUpdated -= timePassed;
       if (cur.lastUpdated <= 0) {
         cur.positions.push({
           x: rocket.position.x,
           y: rocket.position.y,
         });
-        cur.lastUpdated = 2000;
+        cur.lastUpdated = 200;
       }
     }
 
@@ -153,32 +191,13 @@ export function InteractiveMap_ellipse() {
     ctx.stroke();
     ctx.beginPath();
 
-    const cur = historicalRocketPositionsRef.current;
-    if (cur) {
-      let first = true;
-      for (const position of cur.positions) {
-        if (first) {
-          ctx.moveTo(position.x * scale, position.y * scale);
-          first = false;
-        } else {
-          ctx.lineTo(position.x * scale, position.y * scale);
-        }
-      }
-
-      ctx.strokeStyle = isDarkMode ? '#444' : '#aaa';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-
-      for (const position of cur.positions) {
-        ctx.arc(position.x * scale, position.y * scale, 4, 0, 2 * Math.PI);
-        ctx.closePath();
-      }
-      ctx.fillStyle = isDarkMode ? '#444' : '#aaa';
-      ctx.fill();
-      ctx.beginPath();
-    }
+    drawTrajectory(ctx, savedTrajectory, scale, isDarkMode, true);
+    drawTrajectory(
+      ctx,
+      historicalRocketPositionsRef.current?.positions,
+      scale,
+      isDarkMode,
+    );
 
     // draw Earth
     ctx.arc(0, 0, EARTH.radius * 1000 * scale, 0, 2 * Math.PI);
@@ -223,6 +242,17 @@ export function InteractiveMap_ellipse() {
         scale={zoomScale}
         onTimeSpeedChange={setTimeSpeed}
       />
+      <button
+        type="button"
+        onClick={() => {
+          const cur = historicalRocketPositionsRef.current;
+          if (cur) {
+            console.log(cur.positions);
+          }
+        }}
+      >
+        Log trajectory
+      </button>
     </div>
   );
 }
@@ -241,7 +271,11 @@ node2.style.bottom = '0';
 node2.style.right = '0';
 node2.style.width = '500px';
 
-function updateRocketPosition(rocket: Rocket, timePassed: number) {
+function updateRocketPosition(
+  rocket: Rocket,
+  timePassed: number,
+  isSpacePressed: boolean,
+) {
   const directionToPlanet = Math.atan2(-rocket.position.y, -rocket.position.x);
   const distance = Math.sqrt(rocket.position.x ** 2 + rocket.position.y ** 2);
   const g = (G * EARTH.mass) / distance ** 2;
@@ -250,9 +284,18 @@ function updateRocketPosition(rocket: Rocket, timePassed: number) {
     distance: ${distance.toFixed(0)} m<br>
     g: ${g.toFixed(4)}`;
 
-  const speed_change = rotatePoint(
+  const gravitational_speed_change = rotatePoint(
     { x: g * timePassed, y: 0 },
     directionToPlanet,
+  );
+
+  const thrust_speed_change = isSpacePressed
+    ? rotatePoint({ x: THRUST_FORCE * timePassed, y: 0 }, rocket.angle)
+    : { x: 0, y: 0 };
+
+  const speed_change = addPoints(
+    gravitational_speed_change,
+    thrust_speed_change,
   );
 
   rocket.position.x += (rocket.speed.x + speed_change.x / 2) * timePassed;
@@ -260,7 +303,7 @@ function updateRocketPosition(rocket: Rocket, timePassed: number) {
 
   const updatedSpeed = addPoints(rocket.speed, speed_change);
 
-  rocket.angle += calculateAngleChange(rocket.speed, updatedSpeed);
+  // rocket.angle += calculateAngleChange(rocket.speed, updatedSpeed);
 
   rocket.speed = updatedSpeed;
 
@@ -275,4 +318,53 @@ function calculateAngleChange(
   const angle = Math.atan2(speed.y, speed.x);
   const updatedAngle = Math.atan2(updatedSpeed.y, updatedSpeed.x);
   return updatedAngle - angle;
+}
+
+function drawTrajectory(
+  ctx: CanvasRenderingContext2D,
+  trajectory: { x: number; y: number }[] | undefined,
+  scale: number,
+  isDarkMode: boolean,
+  isInitialTrajectory = false,
+) {
+  if (!trajectory) {
+    return;
+  }
+
+  const color = isInitialTrajectory
+    ? isDarkMode
+      ? '#997234'
+      : '#997234'
+    : isDarkMode
+      ? '#444'
+      : '#aaa';
+
+  let first = true;
+  for (const position of trajectory) {
+    if (first) {
+      ctx.moveTo(position.x * scale, position.y * scale);
+      first = false;
+    } else {
+      ctx.lineTo(position.x * scale, position.y * scale);
+    }
+  }
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+
+  if (!isInitialTrajectory) {
+    const max = Math.min(40, trajectory.length);
+    for (let i = 1; i <= max; i += 1) {
+      const position = trajectory[trajectory.length - i];
+      ctx.arc(position.x * scale, position.y * scale, 4, 0, 2 * Math.PI);
+      ctx.closePath();
+    }
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  ctx.beginPath();
 }
