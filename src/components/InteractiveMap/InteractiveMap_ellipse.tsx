@@ -1,12 +1,5 @@
-import {
-  useLayoutEffect,
-  useRef,
-  useEffectEvent,
-  useState,
-  useEffect,
-} from 'react';
+import { useLayoutEffect, useRef, useEffectEvent, useState } from 'react';
 import { usePrefersColorScheme } from 'use-prefers-color-scheme';
-import { clamp } from 'lodash-es';
 
 import styles from './InteractiveMap.module.css';
 import { useOnRender } from '../../hooks/useOnRender';
@@ -16,6 +9,7 @@ import { addPoints, rotatePoint } from './utils';
 import savedTrajectory from './savedTrajectory.json';
 import { useMousePosition } from '../../hooks/useMousePosition';
 import { useKeydown } from '../../hooks/useKeydown';
+import { useZoom } from '../../hooks/useZoom';
 
 type Rocket = {
   position: { x: number; y: number }; // m
@@ -44,7 +38,7 @@ export function InteractiveMap_ellipse() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const colorScheme = usePrefersColorScheme();
   const isDarkMode = colorScheme === 'dark';
-  const [zoomScale, setZoomScale] = useState(1);
+  const zoomScale = useZoom({ canvasRef });
   const scale = KM_TO_SCREEN_WIDTH_RATIO * width * zoomScale;
   const [timeSpeed, setTimeSpeed] = useState(480);
   const historicalRocketPositionsRef = useRef<{
@@ -103,21 +97,6 @@ export function InteractiveMap_ellipse() {
     window.addEventListener('resize', resize, { passive: true });
     return () => {
       window.removeEventListener('resize', resize);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      setZoomScale((zoomScale) =>
-        clamp(zoomScale * (1 - event.deltaY * 0.001), 0.1, 10),
-      );
-    };
-
-    const canvas = canvasRef.current!;
-    canvas.addEventListener('wheel', handleWheel);
-    return () => {
-      canvas.removeEventListener('wheel', handleWheel);
     };
   }, []);
 

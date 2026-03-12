@@ -6,14 +6,14 @@ export function useKeydown(keys: string[], onPress?: (key: string) => void) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (keys.includes(event.key) && !pressedKeys.has(event.key)) {
+      if (keys.includes(event.key)) {
         event.preventDefault();
         pressedKeys.add(event.key);
         onPress?.(event.key);
       }
     };
     const onKeyUp = (event: KeyboardEvent) => {
-      if (keys.includes(event.key) && pressedKeys.has(event.key)) {
+      if (keys.includes(event.key)) {
         pressedKeys.delete(event.key);
       }
     };
