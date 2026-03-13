@@ -1,4 +1,4 @@
-import { useRef, useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 
 type MousePosition = {
   x: number;
