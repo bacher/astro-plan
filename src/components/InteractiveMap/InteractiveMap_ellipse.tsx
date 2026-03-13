@@ -10,6 +10,7 @@ import savedTrajectory from './savedTrajectory.json';
 import { useMousePosition } from '../../hooks/useMousePosition';
 import { useKeydown } from '../../hooks/useKeydown';
 import { useZoom } from '../../hooks/useZoom';
+import { DebugNodes, getDebugNode } from '../DebugNodes/DebugNodes';
 
 type Rocket = {
   position: { x: number; y: number }; // m
@@ -206,49 +207,38 @@ export function InteractiveMap_ellipse() {
   });
 
   return (
-    <div className={styles.root}>
-      <div ref={wrapperRef} className={styles.wrapper}>
-        <canvas
-          ref={canvasRef}
-          className={styles.canvas}
-          width={width}
-          height={height}
+    <>
+      <div className={styles.root}>
+        <div ref={wrapperRef} className={styles.wrapper}>
+          <canvas
+            ref={canvasRef}
+            className={styles.canvas}
+            width={width}
+            height={height}
+          />
+        </div>
+        <Toolbar
+          dateTime={dateTime}
+          timeSpeed={timeSpeed}
+          scale={zoomScale}
+          onTimeSpeedChange={setTimeSpeed}
         />
+        <button
+          type="button"
+          onClick={() => {
+            const cur = historicalRocketPositionsRef.current;
+            if (cur) {
+              console.log(cur.positions);
+            }
+          }}
+        >
+          Log trajectory
+        </button>
       </div>
-      <Toolbar
-        dateTime={dateTime}
-        timeSpeed={timeSpeed}
-        scale={zoomScale}
-        onTimeSpeedChange={setTimeSpeed}
-      />
-      <button
-        type="button"
-        onClick={() => {
-          const cur = historicalRocketPositionsRef.current;
-          if (cur) {
-            console.log(cur.positions);
-          }
-        }}
-      >
-        Log trajectory
-      </button>
-    </div>
+      <DebugNodes />
+    </>
   );
 }
-
-const node = document.createElement('div');
-document.body.appendChild(node);
-node.style.position = 'absolute';
-node.style.bottom = '0';
-node.style.left = '0';
-node.style.width = '500px';
-
-const node2 = document.createElement('div');
-document.body.appendChild(node2);
-node2.style.position = 'absolute';
-node2.style.bottom = '0';
-node2.style.right = '0';
-node2.style.width = '500px';
 
 function updateRocketPosition(
   rocket: Rocket,
@@ -259,7 +249,7 @@ function updateRocketPosition(
   const distance = Math.sqrt(rocket.position.x ** 2 + rocket.position.y ** 2);
   const g = (G * EARTH.mass) / distance ** 2;
 
-  node2.innerHTML = `G: ${G}<br>mass: ${EARTH.mass}<br>
+  getDebugNode('bottom-right').innerHTML = `G: ${G}<br>mass: ${EARTH.mass}<br>
     distance: ${distance.toFixed(0)} m<br>
     g: ${g.toFixed(4)}`;
 
@@ -286,7 +276,8 @@ function updateRocketPosition(
 
   rocket.speed = updatedSpeed;
 
-  node.innerHTML = `x: ${rocket.position.x.toFixed(0)}<br>y: ${rocket.position.y.toFixed(0)}<br>
+  getDebugNode('bottom-left').innerHTML =
+    `x: ${rocket.position.x.toFixed(0)}<br>y: ${rocket.position.y.toFixed(0)}<br>
     speed (x): ${rocket.speed.x.toFixed(2)}<br>speed (y): ${rocket.speed.y.toFixed(2)}`;
 }
 

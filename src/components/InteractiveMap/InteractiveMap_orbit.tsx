@@ -8,6 +8,7 @@ import { addPoints, rotatePoint } from './utils';
 import { useMousePosition } from '../../hooks/useMousePosition';
 import { useZoom } from '../../hooks/useZoom';
 import { useKeydown } from '../../hooks/useKeydown';
+import { DebugNodes, getDebugNode } from '../DebugNodes/DebugNodes';
 
 type Rocket = {
   position: { x: number; y: number }; // m
@@ -81,12 +82,21 @@ export function InteractiveMap_orbit() {
 
     trajectoryRef.current = calculateTrajectory(rocket);
 
-    const g = (G * EARTH.mass) / (x ** 2 + y ** 2);
-    debugNodeLeft.innerHTML = `<h3>Mouse</h3>
-    x: ${x.toFixed(0)} m<br>y: ${y.toFixed(0)} m
-    <h3>Rocket position:</h3>
+    const distanceToAttractorPoint2 = x ** 2 + y ** 2;
+    const distanceToAttractorPoint = Math.sqrt(distanceToAttractorPoint2);
+
+    const g = (G * EARTH.mass) / distanceToAttractorPoint2;
+    getDebugNode('top-left').innerHTML = `<h3>Mouse</h3>
+    x: ${x.toFixed(0)} m<br>y: ${y.toFixed(0)} m<br>
+    gravity: ${g.toFixed(4)} m/s<sup>2</sup><br>
+    Earth center:  ${distanceToAttractorPoint.toFixed(0)} m<br>
+    Earth surface: ${(distanceToAttractorPoint - EARTH.radius * 1000).toFixed(0)} m`;
+
+    const rocketSpeed = Math.sqrt(rocket.speed.x ** 2 + rocket.speed.y ** 2);
+
+    getDebugNode('bottom-left').innerHTML = `<h3>Rocket position:</h3>
     x: ${rocket.position.x.toFixed(0)} m<br>y: ${rocket.position.y.toFixed(0)} m<br>
-    gravity: ${g.toFixed(4)} m/s<sup>2</sup>`;
+    speed: ${rocketSpeed.toFixed(2)} m/s`;
   });
 
   const resize = useEffectEvent(() => {
@@ -156,32 +166,21 @@ export function InteractiveMap_orbit() {
   });
 
   return (
-    <div className={styles.root}>
-      <div ref={wrapperRef} className={styles.wrapper}>
-        <canvas
-          ref={canvasRef}
-          className={styles.canvas}
-          width={width}
-          height={height}
-        />
+    <>
+      <div className={styles.root}>
+        <div ref={wrapperRef} className={styles.wrapper}>
+          <canvas
+            ref={canvasRef}
+            className={styles.canvas}
+            width={width}
+            height={height}
+          />
+        </div>
       </div>
-    </div>
+      <DebugNodes />
+    </>
   );
 }
-
-const debugNodeLeft = document.createElement('div');
-document.body.appendChild(debugNodeLeft);
-debugNodeLeft.style.position = 'absolute';
-debugNodeLeft.style.bottom = '5px';
-debugNodeLeft.style.left = '5px';
-debugNodeLeft.style.width = '500px';
-
-const debugNodeRight = document.createElement('div');
-document.body.appendChild(debugNodeRight);
-debugNodeRight.style.position = 'absolute';
-debugNodeRight.style.bottom = '5px';
-debugNodeRight.style.right = '5px';
-debugNodeRight.style.width = '500px';
 
 function drawTrajectory(
   ctx: CanvasRenderingContext2D,
@@ -331,7 +330,8 @@ function calculateTrajectory(rocket: Rocket): TrajectoryPoint[] {
     currentRocket = updatedRocket;
   }
 
-  debugNodeRight.innerHTML = `Iterations: ${i}`;
+  getDebugNode('bottom-right').innerHTML =
+    `<h3>Debug info</h3>Iterations: ${i}`;
 
   return trajectory;
 }
