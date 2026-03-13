@@ -2,13 +2,24 @@ import { useEffect, useState } from 'react';
 import { InteractiveMap } from '../InteractiveMap/InteractiveMap';
 import { InteractiveMap_ellipse } from '../InteractiveMap/InteractiveMap_ellipse';
 import { InteractiveMap_orbit } from '../InteractiveMap/InteractiveMap_orbit';
+import { InteractiveMap_flow } from '../InteractiveMap/InteractiveMap_flow';
 import styles from './App.module.css';
 
 const APPS = {
-  classic: InteractiveMap,
-  ellipse: InteractiveMap_ellipse,
-  orbit: InteractiveMap_orbit,
+  classic: {
+    name: 'Classic',
+    component: InteractiveMap,
+  },
+  ellipse: { name: 'Ellipse', component: InteractiveMap_ellipse },
+  orbit: { name: 'Orbit', component: InteractiveMap_orbit },
+  flow: { name: 'Flow', component: InteractiveMap_flow },
 } as const;
+
+const appsList = [...Object.entries(APPS)].map(([id, { name, component }]) => ({
+  id,
+  name,
+  component,
+}));
 
 type AppType = keyof typeof APPS;
 
@@ -27,11 +38,11 @@ export function App() {
     });
   }, [appSelected]);
 
-  const AppComponent = APPS[appSelected] ?? APPS.orbit;
+  const AppComponent = (APPS[appSelected] ?? APPS.orbit).component;
 
   return (
-    <div className={styles.app}>
-      <label>
+    <>
+      <label className={styles.appSelector}>
         Select the app:{' '}
         <select
           value={appSelected}
@@ -40,12 +51,16 @@ export function App() {
             location.replace(`#app=${newAppType}`);
           }}
         >
-          <option value="classic">Classic</option>
-          <option value="ellipse">Ellipse</option>
-          <option value="orbit">Orbit</option>
+          {appsList.map(({ id, name }) => (
+            <option key={id} value={id}>
+              {name}
+            </option>
+          ))}
         </select>
       </label>
-      <AppComponent />
-    </div>
+      <div className={styles.app}>
+        <AppComponent />
+      </div>
+    </>
   );
 }

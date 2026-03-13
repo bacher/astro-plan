@@ -1,5 +1,7 @@
 import { memo } from 'react';
 
+import styles from './DebugNodes.module.css';
+
 export function getDebugNode(
   position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right',
 ): HTMLDivElement {
@@ -17,18 +19,22 @@ export const DebugNodes = memo(() => {
     <div>
       <div
         id="debug-node-top-left"
-        style={{ position: 'absolute', top: '5px', left: '5px', width: '500px' }}
+        className={styles.debugNode}
+        style={{ top: '50px', left: '5px', width: '500px' }}
       />
       <div
         id="debug-node-top-right"
-        style={{ position: 'absolute', top: '5px', right: '5px', width: '250px' }}
+        className={styles.debugNode}
+        style={{ top: '5px', right: '5px', width: '250px' }}
       />
       <div
         id="debug-node-bottom-left"
-        style={{ position: 'absolute', bottom: '5px', left: '5px', width: '500px' }}
+        className={styles.debugNode}
+        style={{ bottom: '5px', left: '5px', width: '500px' }}
       />
       <div
         id="debug-node-bottom-right"
+        className={styles.debugNode}
         style={{ position: 'absolute', bottom: '5px', right: '5px', width: '250px' }}
       />
     </div>

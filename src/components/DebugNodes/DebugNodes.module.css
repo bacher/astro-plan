@@ -1,0 +1,11 @@
+.debugNode {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  position: absolute;
+  pointer-events: none;
+
+  & > :is(div, span) {
+    pointer-events: auto;
+  }
+}

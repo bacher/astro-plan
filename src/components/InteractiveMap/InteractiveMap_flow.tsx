@@ -24,7 +24,7 @@ type TrajectoryPoint = {
 
 const KM_TO_SCREEN_WIDTH_RATIO = 0.00000001; // ratio of 1 KM / screen width
 
-export function InteractiveMap_orbit() {
+export function InteractiveMap_flow() {
   const [[width, height], setCanvasSize] = useState([0, 0]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
