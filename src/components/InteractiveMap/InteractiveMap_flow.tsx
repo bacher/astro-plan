@@ -1,4 +1,10 @@
-import { useLayoutEffect, useRef, useEffectEvent, useState } from 'react';
+import {
+  useLayoutEffect,
+  useRef,
+  useEffectEvent,
+  useState,
+  useEffect,
+} from 'react';
 import { usePrefersColorScheme } from 'use-prefers-color-scheme';
 
 import styles from './InteractiveMap.module.css';
@@ -81,13 +87,11 @@ export function InteractiveMap_flow() {
   const lastMousePositionRef = useRef<Point | undefined>(undefined);
   const lastMouseWorldPositionRef = useRef<Point | undefined>(undefined);
 
-  const [rocket] = useState<Rocket>(() => {
-    return {
-      position: { x: 0, y: 0 },
-      angle: 0,
-      speed: { x: 0, y: 0 },
-    };
-  });
+  const [rocket] = useState<Rocket>(() => ({
+    position: { x: 0, y: 0 },
+    angle: 0,
+    speed: { x: 0, y: 0 },
+  }));
 
   const [phase, setPhase] = useState<Phase>(() =>
     orbitTemplate === 'custom'
@@ -218,6 +222,12 @@ export function InteractiveMap_flow() {
 
   useMousePosition(onMouseMove);
 
+  useEffect(() => {
+    if (lastMousePositionRef.current) {
+      onMouseMove(lastMousePositionRef.current);
+    }
+  }, [scale]);
+
   function onCanvasClick(event: React.MouseEvent<HTMLCanvasElement>) {
     onMouseMove({ x: event.clientX, y: event.clientY });
 
@@ -290,11 +300,12 @@ export function InteractiveMap_flow() {
   }, []);
 
   useOnRender(() => {
-    if (scale === 0) {
+    const canvas = canvasRef.current!;
+
+    if (scale === 0 || !canvas) {
       return;
     }
 
-    const canvas = canvasRef.current!;
     const ctx = canvas.getContext('2d')!;
 
     ctx.fillStyle = colorScheme === 'dark' ? '#000' : '#fff';
@@ -411,6 +422,8 @@ export function InteractiveMap_flow() {
     ctx.beginPath();
 
     ctx.restore();
+
+    drawMeasureLine(ctx, scale, height);
   });
 
   return (
@@ -680,4 +693,38 @@ function calcManeuverPlanning(
     deltaSpeed,
     newOrbit,
   };
+}
+
+function drawMeasureLine(
+  ctx: CanvasRenderingContext2D,
+  scale: number,
+  height: number,
+) {
+  let measureUnit = Math.floor((100 * (1 / scale)) / 1000);
+  if (measureUnit >= 10_000) {
+    measureUnit = 1_000 * Math.floor(measureUnit / 1_000);
+  }
+  const measureUnitInPixels = Math.round(1000 * measureUnit * scale);
+
+  ctx.save();
+  ctx.translate(50, height - 50);
+
+  ctx.moveTo(0, 5);
+  ctx.lineTo(0, -5);
+  ctx.moveTo(0, 0);
+  ctx.lineTo(measureUnitInPixels, 0);
+  ctx.moveTo(measureUnitInPixels, +5);
+  ctx.lineTo(measureUnitInPixels, -5);
+  ctx.strokeStyle = '#fff';
+  ctx.stroke();
+  ctx.beginPath();
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.font = '12px Arial';
+  ctx.fillText(`${measureUnit} km`, 5 + measureUnitInPixels / 2, 0);
+  ctx.restore();
+
+  ctx.beginPath();
 }
