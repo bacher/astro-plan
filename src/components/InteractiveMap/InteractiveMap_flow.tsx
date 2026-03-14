@@ -25,7 +25,6 @@ type Point = {
 
 type Rocket = {
   position: Point; // m
-  angle: number; // rads
   speed: Point; // m/s
 };
 
@@ -89,27 +88,32 @@ export function InteractiveMap_flow() {
 
   const [rocket] = useState<Rocket>(() => ({
     position: { x: 0, y: 0 },
-    angle: 0,
     speed: { x: 0, y: 0 },
   }));
 
-  const [phase, setPhase] = useState<Phase>(() =>
-    orbitTemplate === 'custom'
-      ? {
-          type: 'orbit-planning',
-          subType: 'waiting-for-cursor',
-        }
-      : {
-          type: 'orbitting',
-          // TODO
-          orbit: [],
-          previousOrbits: [],
-          subType: calcManeuverPlanning(
-            rocket,
-            lastMouseWorldPositionRef.current,
-          ),
-        },
-  );
+  const [phase, setPhase] = useState<Phase>(() => {
+    if (orbitTemplate === 'custom') {
+      return {
+        type: 'orbit-planning',
+        subType: 'waiting-for-cursor',
+      };
+    }
+
+    const { rocket: initialRocket, orbit } = getTemplateOrbit(orbitTemplate);
+    rocket.position = initialRocket.position;
+    rocket.speed = initialRocket.speed;
+
+    setTimeout(() => {
+      printRocketInfo(rocket);
+    }, 0);
+
+    return {
+      type: 'orbitting',
+      orbit,
+      previousOrbits: [],
+      subType: calcManeuverPlanning(rocket, lastMouseWorldPositionRef.current),
+    };
+  });
 
   const canvasPositionRef = useRef({ x: 0, y: 0 });
 
@@ -180,7 +184,6 @@ export function InteractiveMap_flow() {
           case 'orbit-selection': {
             const dx = x - rocket.position.x;
             const dy = y - rocket.position.y;
-            rocket.angle = Math.atan2(dy, dx);
             rocket.speed = {
               x: dx / 4000,
               y: dy / 4000,
@@ -188,13 +191,7 @@ export function InteractiveMap_flow() {
 
             trajectoryRef.current = calculateTrajectory(rocket);
 
-            const rocketSpeed = Math.sqrt(
-              rocket.speed.x ** 2 + rocket.speed.y ** 2,
-            );
-
-            getDebugNode('bottom-left').innerHTML = `<h3>Rocket:</h3>
-              x: ${rocket.position.x.toFixed(0)} m<br>y: ${rocket.position.y.toFixed(0)} m<br>
-              speed: ${rocketSpeed.toFixed(2)} m/s`;
+            printRocketInfo(rocket);
             break;
           }
         }
@@ -206,6 +203,8 @@ export function InteractiveMap_flow() {
 
             rocket.position = { x: position.x, y: position.y };
             rocket.speed = position.speed;
+
+            printRocketInfo(rocket);
             break;
           }
           case 'maneuver-planning': {
@@ -407,15 +406,6 @@ export function InteractiveMap_flow() {
       ctx.fillStyle = isDarkMode ? '#fff' : '#000';
       ctx.fill();
       ctx.beginPath();
-
-      // draw rocket orientation
-      // ctx.moveTo(rocketX, rocketY);
-      // const dX = Math.cos(rocket.angle);
-      // const dY = Math.sin(rocket.angle);
-      // ctx.lineTo(rocketX + dX * 20, rocketY + dY * 20);
-      // ctx.strokeStyle = isDarkMode ? '#fff' : '#000';
-      // ctx.stroke();
-      // ctx.beginPath();
     }
 
     (window as any).customRender?.(ctx);
@@ -542,7 +532,6 @@ function updateRocketPosition(rocket: Rocket): UpdateRocketPositionResult {
           (rocket.speed.y + speed_change.y / 2) * timePassed,
       },
       speed: addPoints(rocket.speed, speed_change),
-      angle: rocket.angle,
     },
   };
 }
@@ -613,8 +602,12 @@ function calculateTrajectory(rocket: Rocket): TrajectoryPoint[] {
     currentRocket = updatedRocket;
   }
 
-  getDebugNode('bottom-right').innerHTML =
-    `<h3>Debug info</h3>Iterations: ${i}`;
+  try {
+    getDebugNode('bottom-right').innerHTML =
+      `<h3>Debug info</h3>Iterations: ${i}`;
+  } catch {
+    // ignore
+  }
 
   return trajectory;
 }
@@ -655,12 +648,27 @@ function printMouseInfo(phase: Phase, { x, y }: Point) {
   }
 
   getDebugNode('top-left').innerHTML = `<h3>Mouse</h3>
-    <div>x: ${x.toFixed(0)} m<br>y: ${y.toFixed(0)} m</div>
+    <div>x: ${(x / 1000).toFixed(0)} km<br>y: ${(y / 1000).toFixed(0)} km</div>
     <div>gravity: ${g.toFixed(4)} m/s<sup>2</sup></div>
-    <div>Earth center:  ${distanceToAttractorPoint.toFixed(0)} m</div>
-    <div>Earth surface: ${(distanceToAttractorPoint - EARTH.radius * 1000).toFixed(0)} m</div>
+    <div>Earth center:  ${(distanceToAttractorPoint / 1000).toFixed(0)} km</div>
+    <div>Earth surface: ${((distanceToAttractorPoint - EARTH.radius * 1000) / 1000).toFixed(0)} km</div>
     ${deltaSpeedString}
   `;
+}
+
+function printRocketInfo(rocket: Rocket) {
+  const distanceToAttractorPoint2 =
+    rocket.position.x ** 2 + rocket.position.y ** 2;
+  const distanceToAttractorPoint = Math.sqrt(distanceToAttractorPoint2);
+  const g = (G * EARTH.mass) / distanceToAttractorPoint2;
+  const rocketSpeed = Math.sqrt(rocket.speed.x ** 2 + rocket.speed.y ** 2);
+
+  getDebugNode('bottom-left').innerHTML = `<h3>Rocket:</h3>
+    <div>x: ${(rocket.position.x / 1000).toFixed(0)} km<br>y: ${(rocket.position.y / 1000).toFixed(0)} km</div>
+    <div>speed: ${rocketSpeed.toFixed(1)} m/s</div>
+    <div>gravity: ${g.toFixed(4)} m/s<sup>2</sup></div>
+    <div>Earth center:  ${(distanceToAttractorPoint / 1000).toFixed(0)} km</div>
+    <div>Earth surface: ${((distanceToAttractorPoint - EARTH.radius * 1000) / 1000).toFixed(0)} km</div>`;
 }
 
 function calcManeuverPlanning(
@@ -685,7 +693,6 @@ function calcManeuverPlanning(
   const newOrbit = calculateTrajectory({
     position: rocket.position,
     speed: addPoints(rocket.speed, deltaSpeed),
-    angle: rocket.angle,
   });
 
   return {
@@ -727,4 +734,25 @@ function drawMeasureLine(
   ctx.restore();
 
   ctx.beginPath();
+}
+
+function getTemplateOrbit(orbitTemplate: Exclude<OrbitTemplate, 'custom'>): {
+  rocket: Rocket;
+  orbit: TrajectoryPoint[];
+} {
+  let rocket: Rocket;
+
+  switch (orbitTemplate) {
+    case 'iss':
+      rocket = {
+        position: { x: EARTH.radius * 1000 + 408_000, y: 0 },
+        speed: { x: 0, y: 7680 },
+      };
+      break;
+  }
+
+  return {
+    rocket,
+    orbit: calculateTrajectory(rocket),
+  };
 }
