@@ -142,26 +142,22 @@ export function InteractiveMap_flow() {
       if (isPressed) {
         setPhase({
           ...phase,
-          subType: {
-            type: 'orbitting',
-          },
-        });
-      } else {
-        setPhase({
-          ...phase,
           subType: calcManeuverPlanning(
             rocket,
             boost,
             lastMouseWorldPositionRef.current,
           ),
         });
+      } else {
+        setPhase({
+          ...phase,
+          subType: {
+            type: 'orbitting',
+          },
+        });
       }
-      const pos = lastMousePositionRef.current;
-      if (pos) {
-        setTimeout(() => {
-          onMouseMove(pos);
-        }, 0);
-      }
+
+      callOnMouseMoveAsync();
     }
   });
 
@@ -263,12 +259,11 @@ export function InteractiveMap_flow() {
                 type: 'orbitting',
                 orbit: trajectoryRef.current,
                 previousOrbits: [],
-                subType: calcManeuverPlanning(
-                  rocket,
-                  boost,
-                  lastMouseWorldPositionRef.current,
-                ),
+                subType: {
+                  type: 'orbitting',
+                },
               });
+              callOnMouseMoveAsync();
             }
             break;
         }
