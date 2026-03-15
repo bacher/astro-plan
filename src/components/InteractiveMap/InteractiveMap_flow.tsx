@@ -17,6 +17,7 @@ import { useZoom } from '../../hooks/useZoom';
 import { useKeydown } from '../../hooks/useKeydown';
 import { DebugNodes, getDebugNode } from '../DebugNodes/DebugNodes';
 import { usePersistedState } from '../../utils/usePersistedState';
+import { BoostControl } from '../BoostControl/BoostControl';
 
 type Point = {
   x: number;
@@ -69,6 +70,15 @@ type Phase =
           };
     };
 
+export type Boost =
+  | {
+      type: 'manual';
+    }
+  | {
+      type: 'predefined';
+      amount: number;
+    };
+
 export function InteractiveMap_flow() {
   const [[width, height], setCanvasSize] = useState([0, 0]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -82,6 +92,10 @@ export function InteractiveMap_flow() {
     'astro-pan:flow:orbitTemplate',
     'custom',
   );
+
+  const [boost, setBoost] = usePersistedState<Boost>('astro-pan:flow:boost', {
+    type: 'manual',
+  });
 
   const lastMousePositionRef = useRef<Point | undefined>(undefined);
   const lastMouseWorldPositionRef = useRef<Point | undefined>(undefined);
@@ -111,7 +125,11 @@ export function InteractiveMap_flow() {
       type: 'orbitting',
       orbit,
       previousOrbits: [],
-      subType: calcManeuverPlanning(rocket, lastMouseWorldPositionRef.current),
+      subType: calcManeuverPlanning(
+        rocket,
+        boost,
+        lastMouseWorldPositionRef.current,
+      ),
     };
   });
 
@@ -133,6 +151,7 @@ export function InteractiveMap_flow() {
           ...phase,
           subType: calcManeuverPlanning(
             rocket,
+            boost,
             lastMouseWorldPositionRef.current,
           ),
         });
@@ -208,7 +227,7 @@ export function InteractiveMap_flow() {
             break;
           }
           case 'maneuver-planning': {
-            phase.subType = calcManeuverPlanning(rocket, { x, y });
+            phase.subType = calcManeuverPlanning(rocket, boost, { x, y });
             break;
           }
         }
@@ -246,6 +265,7 @@ export function InteractiveMap_flow() {
                 previousOrbits: [],
                 subType: calcManeuverPlanning(
                   rocket,
+                  boost,
                   lastMouseWorldPositionRef.current,
                 ),
               });
@@ -273,6 +293,7 @@ export function InteractiveMap_flow() {
               ],
               subType: calcManeuverPlanning(
                 rocket,
+                boost,
                 lastMouseWorldPositionRef.current,
               ),
             });
@@ -345,7 +366,10 @@ export function InteractiveMap_flow() {
             0,
             2 * Math.PI,
           );
-          ctx.fillStyle = '#ff0';
+
+          const color = isDarkMode ? '#ff0' : '#ffA500';
+
+          ctx.fillStyle = color;
           ctx.fill();
           ctx.beginPath();
 
@@ -359,7 +383,7 @@ export function InteractiveMap_flow() {
               maneuver.deltaSpeed.y / THRUST_TO_MOUSE_SCALER) *
               scale,
           );
-          ctx.strokeStyle = '#ff0';
+          ctx.strokeStyle = color;
           ctx.stroke();
           ctx.beginPath();
         }
@@ -376,11 +400,29 @@ export function InteractiveMap_flow() {
               isDarkMode,
             );
 
-            if (lastMouseWorldPositionRef.current) {
+            if (boost.type === 'manual') {
+              if (lastMouseWorldPositionRef.current) {
+                ctx.moveTo(
+                  rocket.position.x * scale,
+                  rocket.position.y * scale,
+                );
+                ctx.lineTo(
+                  lastMouseWorldPositionRef.current.x * scale,
+                  lastMouseWorldPositionRef.current.y * scale,
+                );
+                ctx.strokeStyle = '#0f0';
+                ctx.stroke();
+                ctx.beginPath();
+              }
+            } else {
               ctx.moveTo(rocket.position.x * scale, rocket.position.y * scale);
               ctx.lineTo(
-                lastMouseWorldPositionRef.current.x * scale,
-                lastMouseWorldPositionRef.current.y * scale,
+                (rocket.position.x +
+                  phase.subType.deltaSpeed.x / THRUST_TO_MOUSE_SCALER) *
+                  scale,
+                (rocket.position.y +
+                  phase.subType.deltaSpeed.y / THRUST_TO_MOUSE_SCALER) *
+                  scale,
               );
               ctx.strokeStyle = '#0f0';
               ctx.stroke();
@@ -416,6 +458,16 @@ export function InteractiveMap_flow() {
     drawMeasureLine(ctx, scale, height);
   });
 
+  function callOnMouseMoveAsync() {
+    const mousePosition = lastMousePositionRef.current;
+    if (mousePosition) {
+      // Annoying to use setTimeout, since setBoost is async
+      setTimeout(() => {
+        onMouseMove(mousePosition);
+      }, 0);
+    }
+  }
+
   return (
     <>
       <div className={styles.root}>
@@ -441,6 +493,16 @@ export function InteractiveMap_flow() {
             height={height}
             onClick={onCanvasClick}
           />
+          {phase.type === 'orbitting' &&
+            phase.subType.type === 'maneuver-planning' && (
+              <BoostControl
+                boost={boost}
+                setBoost={(updatedBoost) => {
+                  setBoost(updatedBoost);
+                  callOnMouseMoveAsync();
+                }}
+              />
+            )}
         </div>
       </div>
       <DebugNodes />
@@ -673,6 +735,7 @@ function printRocketInfo(rocket: Rocket) {
 
 function calcManeuverPlanning(
   rocket: Rocket,
+  boost: Boost,
   worldMousePosition: Point | undefined,
 ): Extract<Phase['subType'], { type: 'maneuver-planning' }> {
   if (!worldMousePosition) {
@@ -686,10 +749,20 @@ function calcManeuverPlanning(
   const dx = worldMousePosition.x - rocket.position.x;
   const dy = worldMousePosition.y - rocket.position.y;
 
-  const deltaSpeed = {
-    x: dx * THRUST_TO_MOUSE_SCALER,
-    y: dy * THRUST_TO_MOUSE_SCALER,
-  };
+  let deltaSpeed: Point;
+  if (boost.type === 'manual') {
+    deltaSpeed = {
+      x: dx * THRUST_TO_MOUSE_SCALER,
+      y: dy * THRUST_TO_MOUSE_SCALER,
+    };
+  } else {
+    const angle = Math.atan2(dy, dx);
+    deltaSpeed = {
+      x: boost.amount * Math.cos(angle),
+      y: boost.amount * Math.sin(angle),
+    };
+  }
+
   const newOrbit = calculateTrajectory({
     position: rocket.position,
     speed: addPoints(rocket.speed, deltaSpeed),

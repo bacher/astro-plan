@@ -5,9 +5,15 @@
 }
 
 .wrapper {
+  display: grid;
   outline: 1px solid #000;
   aspect-ratio: 16 / 9;
   overflow: hidden;
+
+  /* Make children take the full area */
+  & > * {
+    grid-area: 1 / 1;
+  }
 
   @media (prefers-color-scheme: dark) {
     outline-color: #fff;
@@ -15,5 +21,5 @@
 }
 
 .canvas {
-  position: absolute;
+  /* position: absolute; */
 }

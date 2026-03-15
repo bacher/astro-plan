@@ -25,7 +25,7 @@ type AppType = keyof typeof APPS;
 
 function getAppTypeFromHash(): AppType {
   return (
-    (new URLSearchParams(location.hash.substring(1)).get('app') as AppType | undefined) ?? 'orbit'
+    (new URLSearchParams(location.hash.substring(1)).get('app') as AppType | undefined) ?? 'flow'
   );
 }
 
