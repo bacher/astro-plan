@@ -45,12 +45,16 @@ type Phase =
   | {
       type: 'orbit-planning';
       subType:
-        | 'waiting-for-cursor'
-        | 'space-ship-positioning'
-        | 'orbit-selection';
+        | {
+            type: 'waiting-for-cursor' | 'space-ship-positioning';
+          }
+        | {
+            type: 'orbit-selection';
+            trajectory: TrajectoryPoint[] | undefined;
+          };
     }
   | {
-      type: 'orbitting';
+      type: 'orbit-defined';
       orbit: TrajectoryPoint[];
       previousOrbits: {
         orbit: TrajectoryPoint[];
@@ -79,6 +83,41 @@ export type Boost =
       amount: number;
     };
 
+function getPhase(
+  orbitTemplate: OrbitTemplate,
+  rocket: Rocket,
+  boost: Boost,
+  lastMouseWorldPosition: Point | undefined,
+): Phase {
+  if (orbitTemplate === 'custom') {
+    return {
+      type: 'orbit-planning',
+      subType: {
+        type: lastMouseWorldPosition
+          ? 'space-ship-positioning'
+          : 'waiting-for-cursor',
+      },
+    };
+  }
+
+  const { rocket: initialRocket, orbit } = getTemplateOrbit(orbitTemplate);
+  rocket.position = initialRocket.position;
+  rocket.speed = initialRocket.speed;
+
+  setTimeout(() => {
+    printRocketInfo(rocket);
+  }, 0);
+
+  return {
+    type: 'orbit-defined',
+    orbit,
+    previousOrbits: [],
+    subType: {
+      type: 'orbitting',
+    },
+  };
+}
+
 export function InteractiveMap_flow() {
   const [[width, height], setCanvasSize] = useState([0, 0]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -105,40 +144,14 @@ export function InteractiveMap_flow() {
     speed: { x: 0, y: 0 },
   }));
 
-  const [phase, setPhase] = useState<Phase>(() => {
-    if (orbitTemplate === 'custom') {
-      return {
-        type: 'orbit-planning',
-        subType: 'waiting-for-cursor',
-      };
-    }
-
-    const { rocket: initialRocket, orbit } = getTemplateOrbit(orbitTemplate);
-    rocket.position = initialRocket.position;
-    rocket.speed = initialRocket.speed;
-
-    setTimeout(() => {
-      printRocketInfo(rocket);
-    }, 0);
-
-    return {
-      type: 'orbitting',
-      orbit,
-      previousOrbits: [],
-      subType: calcManeuverPlanning(
-        rocket,
-        boost,
-        lastMouseWorldPositionRef.current,
-      ),
-    };
-  });
+  const [phase, setPhase] = useState<Phase>(() =>
+    getPhase(orbitTemplate, rocket, boost, lastMouseWorldPositionRef.current),
+  );
 
   const canvasPositionRef = useRef({ x: 0, y: 0 });
 
-  const trajectoryRef = useRef<TrajectoryPoint[]>(undefined);
-
   useKeydown(['Alt'], ({ isPressed }) => {
-    if (phase.type === 'orbitting') {
+    if (phase.type === 'orbit-defined') {
       if (isPressed) {
         setPhase({
           ...phase,
@@ -185,12 +198,14 @@ export function InteractiveMap_flow() {
 
     switch (phase.type) {
       case 'orbit-planning':
-        switch (phase.subType) {
+        switch (phase.subType.type) {
           case 'waiting-for-cursor':
             rocket.position = { x, y };
             setPhase({
               type: 'orbit-planning',
-              subType: 'space-ship-positioning',
+              subType: {
+                type: 'space-ship-positioning',
+              },
             });
             break;
           case 'space-ship-positioning':
@@ -204,14 +219,14 @@ export function InteractiveMap_flow() {
               y: dy / 4000,
             };
 
-            trajectoryRef.current = calculateTrajectory(rocket);
+            phase.subType.trajectory = calculateTrajectory(rocket);
 
             printRocketInfo(rocket);
             break;
           }
         }
         break;
-      case 'orbitting': {
+      case 'orbit-defined': {
         switch (phase.subType.type) {
           case 'orbitting': {
             const position = findNearestOrbitPoint(phase.orbit, { x, y });
@@ -247,17 +262,30 @@ export function InteractiveMap_flow() {
 
     switch (phase.type) {
       case 'orbit-planning':
-        switch (phase.subType) {
-          case 'space-ship-positioning':
+        switch (phase.subType.type) {
+          case 'space-ship-positioning': {
             event.preventDefault();
-            setPhase({ type: 'orbit-planning', subType: 'orbit-selection' });
+
+            const trajectory =
+              rocket.speed.x === 0 && rocket.speed.y === 0
+                ? undefined
+                : calculateTrajectory(rocket);
+
+            setPhase({
+              type: 'orbit-planning',
+              subType: {
+                type: 'orbit-selection',
+                trajectory,
+              },
+            });
             break;
+          }
           case 'orbit-selection':
-            if (trajectoryRef.current) {
-              event.preventDefault();
+            event.preventDefault();
+            if (phase.subType.trajectory) {
               setPhase({
-                type: 'orbitting',
-                orbit: trajectoryRef.current,
+                type: 'orbit-defined',
+                orbit: phase.subType.trajectory,
                 previousOrbits: [],
                 subType: {
                   type: 'orbitting',
@@ -268,13 +296,13 @@ export function InteractiveMap_flow() {
             break;
         }
         break;
-      case 'orbitting':
+      case 'orbit-defined':
         switch (phase.subType.type) {
           case 'maneuver-planning':
             rocket.speed = addPoints(rocket.speed, phase.subType.deltaSpeed);
 
             setPhase({
-              type: 'orbitting',
+              type: 'orbit-defined',
               orbit: phase.subType.newOrbit,
               previousOrbits: [
                 ...phase.previousOrbits,
@@ -339,17 +367,20 @@ export function InteractiveMap_flow() {
     // draw trajectory
     switch (phase.type) {
       case 'orbit-planning':
-        if (trajectoryRef.current) {
+        if (
+          phase.subType.type === 'orbit-selection' &&
+          phase.subType.trajectory
+        ) {
           drawTrajectory(
             ctx,
-            trajectoryRef.current,
+            phase.subType.trajectory,
             scale,
             'solid',
             isDarkMode,
           );
         }
         break;
-      case 'orbitting':
+      case 'orbit-defined':
         for (const { orbit, maneuver } of phase.previousOrbits) {
           drawTrajectory(ctx, orbit, scale, 'minor', isDarkMode);
 
@@ -433,7 +464,7 @@ export function InteractiveMap_flow() {
 
     if (
       phase.type !== 'orbit-planning' ||
-      phase.subType !== 'waiting-for-cursor'
+      phase.subType.type !== 'waiting-for-cursor'
     ) {
       // draw rocket
       const rocketX = rocket.position.x * scale;
@@ -473,6 +504,15 @@ export function InteractiveMap_flow() {
               value={orbitTemplate}
               onChange={(event) => {
                 setOrbitTemplate(event.target.value as OrbitTemplate);
+                setPhase(
+                  getPhase(
+                    event.target.value as OrbitTemplate,
+                    rocket,
+                    boost,
+                    lastMouseWorldPositionRef.current,
+                  ),
+                );
+                callOnMouseMoveAsync();
               }}
             >
               <option value="custom">Custom</option>
@@ -488,7 +528,7 @@ export function InteractiveMap_flow() {
             height={height}
             onClick={onCanvasClick}
           />
-          {phase.type === 'orbitting' &&
+          {phase.type === 'orbit-defined' &&
             phase.subType.type === 'maneuver-planning' && (
               <BoostControl
                 boost={boost}
@@ -695,7 +735,7 @@ function printMouseInfo(phase: Phase, { x, y }: Point) {
 
   let deltaSpeedString = '';
   if (
-    phase.type === 'orbitting' &&
+    phase.type === 'orbit-defined' &&
     phase.subType.type === 'maneuver-planning'
   ) {
     const speed = Math.sqrt(
