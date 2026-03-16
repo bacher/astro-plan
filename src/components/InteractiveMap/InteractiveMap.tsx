@@ -10,18 +10,12 @@ import { clamp } from 'lodash-es';
 
 import styles from './InteractiveMap.module.css';
 import { useOnRender } from '../../hooks/useOnRender';
-import {
-  AU_IN_KM,
-  AU_IN_M,
-  DAY_IN_SECONDS,
-  G,
-  PLANETS,
-  SUN,
-} from '../../consts/planets';
+import { G, PLANETS, SUN } from '../../consts/planets';
 import { calculatePlanetPosition } from '../../utils/orbitMath';
 import { Toolbar } from '../Toolbar/Toolbar';
 import type { Planet } from '../../types/types';
 import { addPoints, rotatePoint } from './utils';
+import { AU_IN_M } from '../../utils/converters';
 
 const AU_TO_SCREEN_WIDTH_RATIO = 0.1; // 1 AU = 10% screen width
 
@@ -31,7 +25,7 @@ const PLANET_VISUAL_ZOOM = 1000;
 type ScaleInfo = {
   zoomScale: number;
   au: number;
-  km: number;
+  m: number;
 };
 
 function formatDate(date: Date, timeSpeed: number) {
@@ -59,30 +53,27 @@ export function InteractiveMap() {
   const isDarkMode = colorScheme === 'dark';
   const [zoomScale, setZoomScale] = useState(1);
   const auScale = AU_TO_SCREEN_WIDTH_RATIO * width * zoomScale;
-  const kmScale = auScale / AU_IN_KM;
+  const mScale = auScale / AU_IN_M;
   const [timeSpeed, setTimeSpeed] = useState(432000);
   const [rocket] = useState<Rocket>(() => {
     const earth = PLANETS[2];
     const earthPosition = calculatePlanetPosition(earth, time);
 
-    const rotationSpeed =
-      (2 * Math.PI * earth.radius * 1000) /
-      (earth.rotationPeriod * DAY_IN_SECONDS);
+    const rotationSpeed = (2 * Math.PI * earth.radius) / earth.rotationPeriod;
 
     const orbitalSpeed =
-      (2 * Math.PI * earth.semiMajorAxis * AU_IN_M) /
-      (earth.revolutionPeriod * DAY_IN_SECONDS);
+      (2 * Math.PI * earth.semiMajorAxis) / earth.revolutionPeriod;
 
     const rocketPosition = {
       position: addPoints(
         {
-          x: earthPosition.x,
-          y: earthPosition.y,
+          x: earthPosition.x / AU_IN_M,
+          y: earthPosition.y / AU_IN_M,
         },
         rotatePoint(
           {
             x: 0,
-            y: earth.radius / AU_IN_KM,
+            y: earth.radius / AU_IN_M,
           },
           earthPosition.trueAnomaly,
         ),
@@ -105,7 +96,11 @@ export function InteractiveMap() {
     return rocketPosition;
   });
 
-  const scaleInfo: ScaleInfo = { zoomScale, au: auScale, km: kmScale };
+  const scaleInfo: ScaleInfo = {
+    zoomScale,
+    au: auScale,
+    m: mScale,
+  };
 
   const resize = useEffectEvent(() => {
     const wrapper = wrapperRef.current!;
@@ -167,7 +162,7 @@ export function InteractiveMap() {
     ctx.translate(width / 2, height / 2);
 
     ctx.fillStyle = SUN.color;
-    ctx.arc(0, 0, SUN.radius * kmScale * SUN_VISUAL_ZOOM, 0, Math.PI * 2);
+    ctx.arc(0, 0, SUN.radius * mScale * SUN_VISUAL_ZOOM, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
 
@@ -209,7 +204,7 @@ function drawOrbit(
   planet: Planet,
   scaleInfo: ScaleInfo,
 ) {
-  const a = planet.semiMajorAxis * scaleInfo.au;
+  const a = planet.semiMajorAxis * scaleInfo.m;
   const b = a * Math.sqrt(1 - planet.eccentricity ** 2);
   const c = a * planet.eccentricity; // distance from center to focus
 
@@ -229,9 +224,9 @@ function drawPlanet(
   const { x, y } = calculatePlanetPosition(planet, time);
 
   ctx.arc(
-    x * scaleInfo.au,
-    y * scaleInfo.au,
-    planet.radius * scaleInfo.km * PLANET_VISUAL_ZOOM,
+    x * scaleInfo.m,
+    y * scaleInfo.m,
+    planet.radius * scaleInfo.m * PLANET_VISUAL_ZOOM,
     0,
     Math.PI * 2,
   );
@@ -271,8 +266,8 @@ function updateRocketPosition(
   for (const planet of PLANETS) {
     const { x, y } = calculatePlanetPosition(planet, time);
     const directionToPlanet = Math.atan2(
-      y - rocket.position.y,
-      x - rocket.position.x,
+      y / AU_IN_M - rocket.position.y,
+      x / AU_IN_M - rocket.position.x,
     );
 
     const distance = Math.sqrt(

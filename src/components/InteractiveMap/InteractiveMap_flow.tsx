@@ -11,7 +11,7 @@ import styles from './InteractiveMap.module.css';
 import stylesFlow from './InteractiveMap_flow.module.css';
 import { useOnRender } from '../../hooks/useOnRender';
 import { EARTH, G } from '../../consts/planets';
-import { addPoints, rotatePoint } from './utils';
+import { addPoints, formatInterval, rotatePoint } from './utils';
 import { useMousePosition } from '../../hooks/useMousePosition';
 import { useZoom } from '../../hooks/useZoom';
 import { useKeydown } from '../../hooks/useKeydown';
@@ -359,7 +359,7 @@ export function InteractiveMap_flow() {
     ctx.translate(width / 2, height / 2);
 
     // draw Earth
-    ctx.arc(0, 0, EARTH.radius * 1000 * scale, 0, 2 * Math.PI);
+    ctx.arc(0, 0, EARTH.radius * scale, 0, 2 * Math.PI);
     ctx.fillStyle = isDarkMode ? '#fff' : '#000';
     ctx.fill();
     ctx.beginPath();
@@ -591,6 +591,7 @@ type UpdateRocketPositionResult =
     }
   | {
       type: 'continue';
+      timePassed: number;
       rocket: Rocket;
     };
 
@@ -621,6 +622,7 @@ function updateRocketPosition(rocket: Rocket): UpdateRocketPositionResult {
 
   return {
     type: 'continue',
+    timePassed,
     rocket: {
       position: {
         x,
@@ -655,13 +657,15 @@ function calculateTrajectory(rocket: Rocket): TrajectoryPoint[] {
   let phaseChangedCount = 0;
   let i;
 
+  let totalTimePassed = 0;
+
   for (i = 0; i < iterations && phaseLimit > 0; i += 1, phaseLimit -= 1) {
     const updatedRocketResults = updateRocketPosition(currentRocket);
     if (updatedRocketResults.type === 'stop') {
       break;
     }
 
-    const { rocket: updatedRocket } = updatedRocketResults;
+    const { rocket: updatedRocket, timePassed } = updatedRocketResults;
 
     const distance2 =
       (rocket.position.x - updatedRocket.position.x) ** 2 +
@@ -695,13 +699,16 @@ function calculateTrajectory(rocket: Rocket): TrajectoryPoint[] {
       },
     });
 
+    totalTimePassed += timePassed;
+
     lastDistance2 = distance2;
     currentRocket = updatedRocket;
   }
 
   try {
     getDebugNode('bottom-right').innerHTML =
-      `<h3>Debug info</h3>Iterations: ${i}`;
+      `<h3>Debug info</h3>Iterations: ${i}
+      <div>Time passed: ${formatInterval(totalTimePassed)} s</div>`;
   } catch {
     // ignore
   }
@@ -748,7 +755,7 @@ function printMouseInfo(phase: Phase, { x, y }: Point) {
     <div>x: ${(x / 1000).toFixed(0)} km<br>y: ${(y / 1000).toFixed(0)} km</div>
     <div>gravity: ${g.toFixed(4)} m/s<sup>2</sup></div>
     <div>Earth center:  ${(distanceToAttractorPoint / 1000).toFixed(0)} km</div>
-    <div>Earth surface: ${((distanceToAttractorPoint - EARTH.radius * 1000) / 1000).toFixed(0)} km</div>
+    <div>Earth surface: ${((distanceToAttractorPoint - EARTH.radius) / 1000).toFixed(0)} km</div>
     ${deltaSpeedString}
   `;
 }
@@ -765,7 +772,7 @@ function printRocketInfo(rocket: Rocket) {
     <div>speed: ${rocketSpeed.toFixed(1)} m/s</div>
     <div>gravity: ${g.toFixed(4)} m/s<sup>2</sup></div>
     <div>Earth center:  ${(distanceToAttractorPoint / 1000).toFixed(0)} km</div>
-    <div>Earth surface: ${((distanceToAttractorPoint - EARTH.radius * 1000) / 1000).toFixed(0)} km</div>`;
+    <div>Earth surface: ${((distanceToAttractorPoint - EARTH.radius) / 1000).toFixed(0)} km</div>`;
 }
 
 function calcManeuverPlanning(
@@ -853,7 +860,7 @@ function getTemplateOrbit(orbitTemplate: Exclude<OrbitTemplate, 'custom'>): {
   switch (orbitTemplate) {
     case 'iss':
       rocket = {
-        position: { x: EARTH.radius * 1000 + 408_000, y: 0 },
+        position: { x: EARTH.radius + 408_000, y: 0 },
         speed: { x: 0, y: 7680 },
       };
       break;

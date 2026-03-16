@@ -1,11 +1,11 @@
 export type Planet = {
   name: string;
   color: string;
-  radius: number; // km
-  semiMajorAxis: number; // AU
+  radius: number; // m
+  semiMajorAxis: number; // meters
   eccentricity: number;
   mass: number; // kg
-  revolutionPeriod: number; // days
-  rotationPeriod: number; // days
+  revolutionPeriod: number; // seconds
+  rotationPeriod: number; // seconds
   meanAnomaly: number;
 };

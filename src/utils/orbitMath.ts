@@ -1,7 +1,5 @@
 import type { Planet } from "../types/types";
 
-const SECONDS_IN_DAY = 86400;
-
 // export function calculatePlanetPosition(
 //   planet: Planet,
 //   time: number
@@ -39,7 +37,7 @@ export function calculatePlanetPosition(
 ): { x: number; y: number; r: number; trueAnomaly: number } {
   // Calculate mean anomaly
   const n = (2 * Math.PI) / planet.revolutionPeriod; // mean motion
-  const M = planet.meanAnomaly + n * (time / SECONDS_IN_DAY);
+  const M = planet.meanAnomaly + n * time;
 
   // Solve Kepler's equation for eccentric anomaly
   const E = solveKeplersEquation(M, planet.eccentricity);

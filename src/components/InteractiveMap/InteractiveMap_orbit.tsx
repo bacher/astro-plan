@@ -90,7 +90,7 @@ export function InteractiveMap_orbit() {
     <div>x: ${x.toFixed(0)} m<br>y: ${y.toFixed(0)} m</div>
     <div>gravity: ${g.toFixed(4)} m/s<sup>2</sup></div>
     <div>Earth center:  ${distanceToAttractorPoint.toFixed(0)} m</div>
-    <div>Earth surface: ${(distanceToAttractorPoint - EARTH.radius * 1000).toFixed(0)} m</div>
+    <div>Earth surface: ${(distanceToAttractorPoint - EARTH.radius).toFixed(0)} m</div>
     `;
 
     const rocketSpeed = Math.sqrt(rocket.speed.x ** 2 + rocket.speed.y ** 2);
@@ -132,7 +132,7 @@ export function InteractiveMap_orbit() {
     ctx.translate(width / 2, height / 2);
 
     // draw Earth
-    ctx.arc(0, 0, EARTH.radius * 1000 * scale, 0, 2 * Math.PI);
+    ctx.arc(0, 0, EARTH.radius * scale, 0, 2 * Math.PI);
     ctx.fillStyle = isDarkMode ? '#fff' : '#000';
     ctx.fill();
     ctx.beginPath();

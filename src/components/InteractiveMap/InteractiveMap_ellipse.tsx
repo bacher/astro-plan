@@ -51,7 +51,7 @@ export function InteractiveMap_ellipse() {
 
   const [rocket] = useState(() => {
     return {
-      position: { x: -(418_200 + EARTH.radius * 1000), y: 0 },
+      position: { x: -(418_200 + EARTH.radius), y: 0 },
       angle: 0,
       speed: { x: 0, y: 1.25 * 7_663.584 }, // wiki: ~7.7km/s
     };
@@ -180,7 +180,7 @@ export function InteractiveMap_ellipse() {
     );
 
     // draw Earth
-    ctx.arc(0, 0, EARTH.radius * 1000 * scale, 0, 2 * Math.PI);
+    ctx.arc(0, 0, EARTH.radius * scale, 0, 2 * Math.PI);
     ctx.fillStyle = isDarkMode ? '#fff' : '#000';
     ctx.fill();
     ctx.beginPath();
