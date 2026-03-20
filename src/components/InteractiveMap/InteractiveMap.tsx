@@ -16,8 +16,9 @@ import { Toolbar } from '../Toolbar/Toolbar';
 import type { Planet } from '../../types/types';
 import { addPoints, rotatePoint } from './utils';
 import { AU_IN_M } from '../../utils/converters';
+import { DebugNodes, getDebugNode } from '../DebugNodes/DebugNodes';
 
-const AU_TO_SCREEN_WIDTH_RATIO = 0.1; // 1 AU = 10% screen width
+const AU_TO_SCREEN_WIDTH_RATIO = 0.2; // 1 AU = % screen width
 
 const SUN_VISUAL_ZOOM = 30;
 const PLANET_VISUAL_ZOOM = 1000;
@@ -37,7 +38,11 @@ function formatDate(date: Date, timeSpeed: number) {
 type Rocket = {
   position: { x: number; y: number }; // m
   velocity: { x: number; y: number }; // m/s
+  angle: number; // rads
 };
+
+// const INITIAL_TIME_SPEED = 432000;
+const INITIAL_TIME_SPEED = 3600;
 
 export function InteractiveMap() {
   const [[width, height], setCanvasSize] = useState([0, 0]);
@@ -51,40 +56,58 @@ export function InteractiveMap() {
   const isDarkMode = colorScheme === 'dark';
   const [zoomScale, setZoomScale] = useState(1);
   const mScale = (AU_TO_SCREEN_WIDTH_RATIO / AU_IN_M) * width * zoomScale;
-  const [timeSpeed, setTimeSpeed] = useState(432000);
-  const [rocket] = useState<Rocket>(() => {
+  const [timeSpeed, setTimeSpeed] = useState(INITIAL_TIME_SPEED);
+  const [rocket] = useState((): Rocket => {
     const earth = PLANETS[2];
     const earthPosition = calculatePlanetPosition(earth, time);
+    const orbit = 408_000;
 
-    const rotationSpeed = (2 * Math.PI * earth.radius) / earth.rotationPeriod;
+    const orbitingEarthSpeed =
+      (2 * Math.PI * (earth.radius + orbit)) / earth.rotationPeriod;
 
-    const orbitalSpeed =
+    const orbitingSunSpeed =
       (2 * Math.PI * earth.semiMajorAxis) / earth.revolutionPeriod;
 
-    const rocketPosition = {
-      position: addPoints(
+    const position = addPoints(
+      earthPosition,
+      rotatePoint(
         {
-          x: earthPosition.x,
-          y: earthPosition.y,
-        },
-        rotatePoint(
-          {
-            x: 0,
-            y: earth.radius,
-          },
-          earthPosition.trueAnomaly,
-        ),
-      ),
-      velocity: rotatePoint(
-        {
-          x: 100,
-          y: orbitalSpeed + rotationSpeed,
+          x: 0,
+          y: earth.radius + orbit,
         },
         earthPosition.trueAnomaly,
       ),
-    };
+    );
 
-    return rocketPosition;
+    // console.log('earth position', earthPosition);
+    // console.log('initial position', position);
+    // console.log('distance', {
+    //   x: position.x - earthPosition.x,
+    //   y: position.y - earthPosition.y,
+    // });
+
+    const orbitingEarthSpeedVector = rotatePoint(
+      {
+        x: 0,
+        // y: orbitingEarthSpeed,
+        y: 7_680,
+      },
+      earthPosition.trueAnomaly + Math.PI / 2,
+    );
+
+    const orbitingSunSpeedVector = rotatePoint(
+      {
+        x: 0,
+        y: orbitingSunSpeed,
+      },
+      earthPosition.trueAnomaly,
+    );
+
+    return {
+      position,
+      velocity: addPoints(orbitingEarthSpeedVector, orbitingSunSpeedVector),
+      angle: earthPosition.trueAnomaly,
+    };
   });
 
   const scaleInfo: ScaleInfo = {
@@ -167,26 +190,47 @@ export function InteractiveMap() {
     drawRocket(ctx, rocket, scaleInfo, isDarkMode);
 
     ctx.restore();
+
+    ctx.save();
+    ctx.translate(10, 10);
+    drawArrow(ctx, isDarkMode);
+    ctx.rotate(Math.PI / 2);
+    drawArrow(ctx, isDarkMode);
+    ctx.restore();
   });
 
   return (
-    <div className={styles.root}>
-      <div ref={wrapperRef} className={styles.wrapper}>
-        <canvas
-          ref={canvasRef}
-          className={styles.canvas}
-          width={width}
-          height={height}
+    <>
+      <div className={styles.root}>
+        <div ref={wrapperRef} className={styles.wrapper}>
+          <canvas
+            ref={canvasRef}
+            className={styles.canvas}
+            width={width}
+            height={height}
+          />
+        </div>
+        <Toolbar
+          dateTime={dateTime}
+          timeSpeed={timeSpeed}
+          scale={zoomScale}
+          onTimeSpeedChange={setTimeSpeed}
         />
       </div>
-      <Toolbar
-        dateTime={dateTime}
-        timeSpeed={timeSpeed}
-        scale={zoomScale}
-        onTimeSpeedChange={setTimeSpeed}
-      />
-    </div>
+      <DebugNodes />
+    </>
   );
+}
+
+function drawArrow(ctx: CanvasRenderingContext2D, isDarkMode: boolean) {
+  ctx.moveTo(0, 0);
+  ctx.lineTo(50, 0);
+  ctx.lineTo(45, 5);
+  ctx.moveTo(50, 0);
+  ctx.lineTo(45, -5);
+  ctx.strokeStyle = isDarkMode ? '#fff' : '#000';
+  ctx.stroke();
+  ctx.beginPath();
 }
 
 function drawOrbit(
@@ -241,6 +285,15 @@ function drawRocket(
   ctx.fillStyle = isDarkMode ? '#fff' : '#000';
   ctx.fill();
   ctx.beginPath();
+
+  ctx.moveTo(rocket.position.x * scaleInfo.m, rocket.position.y * scaleInfo.m);
+  ctx.lineTo(
+    rocket.position.x * scaleInfo.m + Math.cos(rocket.angle) * 20,
+    rocket.position.y * scaleInfo.m + Math.sin(rocket.angle) * 20,
+  );
+  ctx.strokeStyle = isDarkMode ? '#fff' : '#000';
+  ctx.stroke();
+  ctx.beginPath();
 }
 
 function updateRocketPosition(
@@ -248,12 +301,15 @@ function updateRocketPosition(
   time: number,
   timePassed: number, // in seconds
 ) {
-  rocket.position.x += rocket.velocity.x * timePassed;
-  rocket.position.y += rocket.velocity.y * timePassed;
+  let velocityChange = { x: 0, y: 0 };
 
-  for (const planet of PLANETS) {
-    const { x, y } = calculatePlanetPosition(planet, time);
-    const directionToPlanet = Math.atan2(
+  for (const object of [SUN, ...PLANETS]) {
+    const { x, y } =
+      object.type === 'star'
+        ? { x: 0, y: 0 }
+        : calculatePlanetPosition(object, time);
+
+    const directionToObject = Math.atan2(
       y - rocket.position.y,
       x - rocket.position.x,
     );
@@ -262,14 +318,27 @@ function updateRocketPosition(
       (rocket.position.x - x) ** 2 + (rocket.position.y - y) ** 2,
     );
 
-    const g = (G * planet.mass) / distance ** 2;
-    rocket.velocity = addPoints(
-      rocket.velocity,
-      rotatePoint({ x: g * timePassed, y: 0 }, directionToPlanet),
+    const g = (G * object.mass) / distance ** 2;
+    velocityChange = addPoints(
+      velocityChange,
+      rotatePoint({ x: g * timePassed, y: 0 }, directionToObject),
     );
 
-    if (planet.name === 'Earth') {
-      // console.log("Velocity:", rocket.velocity.x, rocket.velocity.y);
+    if (object.name === 'Earth') {
+      const distanceToEarthCenter =
+        (Math.sqrt(
+          (rocket.position.x - x) ** 2 + (rocket.position.y - y) ** 2,
+        ) -
+          object.radius) /
+        1000;
+
+      getDebugNode('bottom-right').innerHTML =
+        `<div>to Earth: ${distanceToEarthCenter.toFixed(0)} km</div>`;
     }
   }
+
+  rocket.position.x += (rocket.velocity.x + velocityChange.x / 2) * timePassed;
+  rocket.position.y += (rocket.velocity.y + velocityChange.y / 2) * timePassed;
+
+  rocket.velocity = addPoints(rocket.velocity, velocityChange);
 }
