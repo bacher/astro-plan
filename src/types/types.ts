@@ -1,7 +1,7 @@
 export type Planet = {
   name: string;
   color: string;
-  radius: number; // m
+  radius: number; // meters
   semiMajorAxis: number; // meters
   eccentricity: number;
   mass: number; // kg

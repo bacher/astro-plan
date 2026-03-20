@@ -24,7 +24,6 @@ const PLANET_VISUAL_ZOOM = 1000;
 
 type ScaleInfo = {
   zoomScale: number;
-  au: number;
   m: number;
 };
 
@@ -36,9 +35,8 @@ function formatDate(date: Date, timeSpeed: number) {
 }
 
 type Rocket = {
-  position: { x: number; y: number }; // au
+  position: { x: number; y: number }; // m
   velocity: { x: number; y: number }; // m/s
-  orientation: { x: number; y: number };
 };
 
 export function InteractiveMap() {
@@ -52,8 +50,7 @@ export function InteractiveMap() {
   const colorScheme = usePrefersColorScheme();
   const isDarkMode = colorScheme === 'dark';
   const [zoomScale, setZoomScale] = useState(1);
-  const auScale = AU_TO_SCREEN_WIDTH_RATIO * width * zoomScale;
-  const mScale = auScale / AU_IN_M;
+  const mScale = (AU_TO_SCREEN_WIDTH_RATIO / AU_IN_M) * width * zoomScale;
   const [timeSpeed, setTimeSpeed] = useState(432000);
   const [rocket] = useState<Rocket>(() => {
     const earth = PLANETS[2];
@@ -67,13 +64,13 @@ export function InteractiveMap() {
     const rocketPosition = {
       position: addPoints(
         {
-          x: earthPosition.x / AU_IN_M,
-          y: earthPosition.y / AU_IN_M,
+          x: earthPosition.x,
+          y: earthPosition.y,
         },
         rotatePoint(
           {
             x: 0,
-            y: earth.radius / AU_IN_M,
+            y: earth.radius,
           },
           earthPosition.trueAnomaly,
         ),
@@ -85,20 +82,13 @@ export function InteractiveMap() {
         },
         earthPosition.trueAnomaly,
       ),
-      orientation: rotatePoint({ x: 0, y: 1 }, earthPosition.trueAnomaly),
     };
 
-    console.log(
-      'Rocket initial velocity:',
-      rocketPosition.velocity.x,
-      rocketPosition.velocity.y,
-    );
     return rocketPosition;
   });
 
   const scaleInfo: ScaleInfo = {
     zoomScale,
-    au: auScale,
     m: mScale,
   };
 
@@ -241,12 +231,10 @@ function drawRocket(
   scaleInfo: ScaleInfo,
   isDarkMode: boolean,
 ) {
-  ctx.ellipse(
-    rocket.position.x * scaleInfo.au,
-    rocket.position.y * scaleInfo.au,
-    10,
+  ctx.arc(
+    rocket.position.x * scaleInfo.m,
+    rocket.position.y * scaleInfo.m,
     5,
-    Math.atan2(rocket.orientation.y, rocket.orientation.x),
     0,
     2 * Math.PI,
   );
@@ -260,21 +248,21 @@ function updateRocketPosition(
   time: number,
   timePassed: number, // in seconds
 ) {
-  rocket.position.x += (rocket.velocity.x * timePassed) / AU_IN_M;
-  rocket.position.y += (rocket.velocity.y * timePassed) / AU_IN_M;
+  rocket.position.x += rocket.velocity.x * timePassed;
+  rocket.position.y += rocket.velocity.y * timePassed;
 
   for (const planet of PLANETS) {
     const { x, y } = calculatePlanetPosition(planet, time);
     const directionToPlanet = Math.atan2(
-      y / AU_IN_M - rocket.position.y,
-      x / AU_IN_M - rocket.position.x,
+      y - rocket.position.y,
+      x - rocket.position.x,
     );
 
     const distance = Math.sqrt(
       (rocket.position.x - x) ** 2 + (rocket.position.y - y) ** 2,
     );
 
-    const g = (G * planet.mass) / (distance * AU_IN_M) ** 2;
+    const g = (G * planet.mass) / distance ** 2;
     rocket.velocity = addPoints(
       rocket.velocity,
       rotatePoint({ x: g * timePassed, y: 0 }, directionToPlanet),
